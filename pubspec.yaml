@@ -1,0 +1,23 @@
+name: unidate
+description: "Unidate is a space where every identity is celebrated. Our diverse range of orientation and gender identity options ensures that you can show up as your true self and find exactly who you’re looking for without compromise."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # Include all images inside this folder (simpler and less error‑prone)
+    - assets/images/
