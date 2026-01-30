@@ -70,8 +70,11 @@ class _LandingPageState extends State<LandingPage> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final isNarrow = constraints.maxWidth < 900;
-                          return Flex(
+                          // Constrain height so Flex with spaceBetween + Expanded doesn't get unbounded (avoids box.dart assertion).
+                          const storyRowHeight = 300.0;
+                          final flexChild = Flex(
                             direction: isNarrow ? Axis.vertical : Axis.horizontal,
+                            mainAxisSize: isNarrow ? MainAxisSize.min : MainAxisSize.max,
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Expanded(
@@ -99,6 +102,7 @@ class _LandingPageState extends State<LandingPage> {
                               ),
                             ],
                           );
+                          return isNarrow ? flexChild : SizedBox(height: storyRowHeight, child: flexChild);
                         },
                       ),
                     ],
@@ -115,8 +119,9 @@ class _LandingPageState extends State<LandingPage> {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final isNarrow = constraints.maxWidth < 800;
-                          return Flex(
+                          final flexChild = Flex(
                             direction: isNarrow ? Axis.vertical : Axis.horizontal,
+                            mainAxisSize: isNarrow ? MainAxisSize.min : MainAxisSize.max,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _FooterColumn(title: 'Legal', items: const ['Privacy', 'Terms', 'Cookie Policy', 'Accessibility']),
@@ -128,6 +133,8 @@ class _LandingPageState extends State<LandingPage> {
                               _FooterColumn(title: 'More', items: const ['FAQ', 'Contact', 'Safety resources']),
                             ],
                           );
+                          // Give horizontal row a bounded height to avoid unbounded cross-axis (box.dart assertion).
+                          return isNarrow ? flexChild : SizedBox(height: 200, child: flexChild);
                         },
                       ),
                       const SizedBox(height: 24),

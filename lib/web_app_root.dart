@@ -23,26 +23,46 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
   String? _signedInUid;
   String? _error;
 
+  /// Token from Uri.base at startup (Flutter may see query params here before any navigation).
+  final String? _initialToken = () {
+    try {
+      final q = Uri.base.queryParameters;
+      return q['_clerk_db_jwt'] ?? q['_clerk_db_jwi'] ?? q['__clerk_ticket'] ?? q['token'] ?? q['code'];
+    } catch (_) {
+      return null;
+    }
+  }();
+
   @override
   void initState() {
     super.initState();
-    // Run after first frame so the browser's URL (including query params from Clerk redirect) is stable.
+    // If we already have a token (from Uri.base or cached at library load), start immediately.
+    if ((_initialToken ?? '').isNotEmpty) {
+      _handleCallback();
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _handleCallback();
     });
   }
 
   Future<void> _handleCallback() async {
-    final token = web_redirect.getClerkCallbackToken();
+    String? token;
+    try {
+      token = web_redirect.getClerkCallbackToken() ?? _initialToken;
+    } catch (_) {
+      token = _initialToken;
+    }
     if (token == null || token.isEmpty) {
       if (mounted) setState(() { _checkingCallback = false; });
       return;
     }
     try {
       final customToken = await _backend.getCustomToken(token);
+      if (customToken.isEmpty) throw Exception('No token returned');
       await _auth.signInWithCustomToken(customToken);
       final uid = _auth.clerkIdFromFirebase;
-      if (mounted && uid != null) {
+      if (mounted && uid != null && uid.isNotEmpty) {
         setState(() {
           _checkingCallback = false;
           _signedInUid = uid;
@@ -50,10 +70,11 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
       } else if (mounted) {
         setState(() { _checkingCallback = false; _error = 'Firebase sign-in failed'; });
       }
-    } catch (e) {
+    } catch (e, stack) {
       if (mounted) {
         setState(() { _checkingCallback = false; _error = e.toString(); });
       }
+      assert(() { debugPrint('Auth callback error: $e\n$stack'); return true; }());
     }
   }
 
@@ -65,22 +86,41 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
     web_redirect.redirectToClerkSignIn(url);
   }
 
-  @override
-  Widget build(BuildContext context) {
+  /// Single MaterialApp so we never swap root widgets (avoids updateChild/rebuild crashes).
+  Widget _buildHome() {
     if (_checkingCallback) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFFFF4458)),
+              const SizedBox(height: 16),
+              Text('Loading...', style: TextStyle(color: Colors.white70)),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_signedInUid != null) {
+      return WebAuthGate(userId: _signedInUid!);
+    }
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const CircularProgressIndicator(color: Color(0xFFFF4458)),
+                Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                Text(
-                  'Loading...',
-                  style: TextStyle(color: Colors.white70),
+                ElevatedButton(
+                  onPressed: () => setState(() { _error = null; _checkingCallback = true; _handleCallback(); }),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
+                  child: const Text('Retry'),
                 ),
               ],
             ),
@@ -88,40 +128,13 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
         ),
       );
     }
-    if (_signedInUid != null) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: WebAuthGate(userId: _signedInUid!),
-      );
+    // About to show landing – re-check URL and initial token; if present we missed it, retry once.
+    String? tokenNow;
+    try {
+      tokenNow = web_redirect.getClerkCallbackToken() ?? Uri.base.queryParameters['_clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwi'] ?? _initialToken;
+    } catch (_) {
+      tokenNow = _initialToken;
     }
-    if (_error != null) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => setState(() { _error = null; _checkingCallback = true; _handleCallback(); }),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    // About to show landing – re-check URL; if token is present we missed it (e.g. timing), retry once.
-    // Check both redirect helper and Uri.base so we catch the token even if one source fails.
-    final tokenNow = web_redirect.getClerkCallbackToken() ?? Uri.base.queryParameters['_clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwi'];
     if (tokenNow != null && tokenNow.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -129,31 +142,28 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
           _handleCallback();
         }
       });
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: Colors.black,
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: Color(0xFFFF4458)),
-                const SizedBox(height: 16),
-                Text('Signing you in...', style: TextStyle(color: Colors.white70)),
-              ],
-            ),
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFFFF4458)),
+              const SizedBox(height: 16),
+              Text('Signing you in...', style: TextStyle(color: Colors.white70)),
+            ],
           ),
         ),
       );
     }
+    return LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false));
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
-        '/sign-in': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
-        '/sign-up': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
-      },
+      home: _buildHome(),
     );
   }
 }
