@@ -1,21 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
+import 'firebase_options.dart';
 import 'learn_page.dart';
 import 'safety_page.dart';
 import 'support_page.dart';
+import 'screens/auth_gate.dart';
+import 'screens/auth_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MainApp());
 }
-
 
 class MainApp extends StatelessWidget {
   const MainApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const LandingPage(),
+    return ClerkAuth(
+      config: ClerkAuthConfig(
+        publishableKey: const String.fromEnvironment(
+          'CLERK_PUBLISHABLE_KEY',
+          defaultValue: 'pk_test_d29ya2luZy10dXJ0bGUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA',
+        ),
+      ),
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        initialRoute: '/',
+        routes: {
+          '/': (context) => ClerkAuthBuilder(
+            signedOutBuilder: (context, state) => const LandingPage(),
+            signedInBuilder: (context, state) => AuthGate(authState: state),
+          ),
+          '/sign-up': (context) => const AuthScreen(isSignUp: true),
+          '/sign-in': (context) => const AuthScreen(isSignUp: false),
+        },
+      ),
     );
   }
 }
@@ -121,7 +143,7 @@ class _LandingPageState extends State<LandingPage> {
                                   ),
                                 ),
                                 onPressed: () {
-                                  // TODO: Navigate to create account
+                                  Navigator.of(context).pushNamed('/sign-up');
                                 },
                                 child: const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
@@ -363,7 +385,7 @@ class _LandingPageState extends State<LandingPage> {
                         const EdgeInsets.symmetric(horizontal: 26, vertical: 10),
                   ),
                   onPressed: () {
-                    // TODO: Navigate to log in
+                    Navigator.of(context).pushNamed('/sign-in');
                   },
                   child: const Text(
                     'Log in',

@@ -9,6 +9,20 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Auth
+  clerk_flutter: ^0.0.13-beta
+  firebase_core: ^3.8.1
+  firebase_auth: ^5.3.3
+  cloud_firestore: ^5.5.2
+  firebase_storage: ^12.3.6
+  # Profile images (crop, compress); R2 upload via presigned URL can replace storage
+  image_picker: ^1.1.2
+  image_cropper: ^8.0.2
+  flutter_image_compress: ^2.3.0
+  # HTTP for Cloud Function calls (custom token, OTP)
+  http: ^1.2.2
+  # UUID for doc IDs where needed
+  uuid: ^4.5.1
 
 dev_dependencies:
   flutter_test:

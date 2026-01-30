@@ -1,0 +1,11 @@
+{
+  "name": "unidate-functions",
+  "description": "Cloud Functions: Clerk custom token, university OTP",
+  "main": "index.js",
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0",
+    "@clerk/backend": "^1.0.0"
+  }
+}

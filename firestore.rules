@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users: read/write own document only. uid from Firebase Auth (set via custom token = Clerk ID).
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    // Config: read-only for all authenticated.
+    match /config/{doc} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    // Swipes: actor can create/read own swipes; need to allow read for target for "who liked me".
+    match /swipes/{swipeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.actorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+    // Matches: participants can read/update; create requires auth and being one of the pair.
+    match /matches/{matchId} {
+      allow create: if request.auth != null
+        && (request.auth.uid == request.resource.data.user1Id || request.auth.uid == request.resource.data.user2Id);
+      allow read, update, delete: if request.auth != null
+        && (request.auth.uid == resource.data.user1Id || request.auth.uid == resource.data.user2Id);
+    }
+    // Chats: participants can read/update; create requires auth and being one of the pair.
+    match /chats/{chatId} {
+      allow create: if request.auth != null
+        && (request.auth.uid == request.resource.data.user1Id || request.auth.uid == request.resource.data.user2Id);
+      allow read, update, delete: if request.auth != null
+        && (request.auth.uid == resource.data.user1Id || request.auth.uid == resource.data.user2Id);
+      match /messages/{msgId} {
+        allow read, write: if request.auth != null;
+      }
+    }
+  }
+}
