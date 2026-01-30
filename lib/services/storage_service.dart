@@ -1,12 +1,14 @@
 import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
 
-/// Profile image storage. Plan specifies R2; using Firebase Storage for MVP.
-/// R2 can be swapped via presigned URL upload when backend is ready.
+import 'package:http/http.dart' as http;
+
+import 'backend_service.dart';
+
+/// Profile image storage on Cloudflare R2 via presigned URLs from the backend.
+/// Path pattern: users/{userId}/profile/{index}.webp (0–4).
 class StorageService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final BackendService _backend = BackendService();
 
-  /// Path pattern: users/{userId}/profile/{index}.webp (0-4).
   String profileImagePath(String userId, int index) =>
       'users/$userId/profile/$index.webp';
 
@@ -16,16 +18,25 @@ class StorageService {
     Uint8List bytes, {
     String? contentType,
   }) async {
-    final ref = _storage.ref().child(profileImagePath(userId, index));
-    await ref.putData(
-      bytes,
-      SettableMetadata(contentType: contentType ?? 'image/webp'),
+    final path = profileImagePath(userId, index);
+    final urls = await _backend.getUploadUrl(path);
+    final uploadUrl = urls['uploadUrl']!;
+    final publicUrl = urls['publicUrl']!;
+
+    final res = await http.put(
+      Uri.parse(uploadUrl),
+      headers: {'Content-Type': contentType ?? 'image/webp'},
+      body: bytes,
     );
-    return ref.getDownloadURL();
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception('R2 upload failed: ${res.statusCode} ${res.body}');
+    }
+    return publicUrl;
   }
 
+  /// Removing an image only updates Firestore (profileImageUrls).
+  /// Object in R2 is left as-is unless you add a delete endpoint.
   Future<void> deleteProfileImage(String userId, int index) async {
-    final ref = _storage.ref().child(profileImagePath(userId, index));
-    await ref.delete();
+    // No-op: R2 object remains. Add api/delete-object if you need to delete from R2.
   }
 }

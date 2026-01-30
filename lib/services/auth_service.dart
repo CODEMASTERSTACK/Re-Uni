@@ -1,8 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:clerk_flutter/clerk_flutter.dart';
 
 /// Bridges Clerk (auth UI + session) and Firebase (Firestore access).
 /// After Clerk sign-in, call backend to get Firebase custom token and sign in.
+/// For sign-out, call Firebase signOut here and Clerk signOut from the UI (ClerkAuth.of(context).signOut()).
 class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
 
@@ -10,14 +10,14 @@ class AuthService {
 
   Stream<User?> get authStateChanges => _firebaseAuth.authStateChanges();
 
-  /// Sign in to Firebase with a custom token (from Cloud Function that verifies Clerk JWT).
+  /// Sign in to Firebase with a custom token (from backend that verifies Clerk JWT).
   Future<void> signInWithCustomToken(String token) async {
     await _firebaseAuth.signInWithCustomToken(token);
   }
 
+  /// Signs out of Firebase only. Call Clerk signOut from UI via ClerkAuth.of(context).signOut().
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
-    await Clerk.instance.signOut();
   }
 
   /// Clerk user ID is the canonical userId for Firestore and R2.

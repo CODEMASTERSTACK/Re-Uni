@@ -5,7 +5,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
-    // Config: read-only for all authenticated.
+    // Config: read-only for all authenticated. Allow create for config/interests only when missing (app seeds it).
+    match /config/interests {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && !exists(/databases/$(database)/documents/config/interests);
+      allow update, delete: if false;
+    }
     match /config/{doc} {
       allow read: if request.auth != null;
       allow write: if false;
@@ -30,8 +35,14 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null
         && (request.auth.uid == resource.data.user1Id || request.auth.uid == resource.data.user2Id);
       match /messages/{msgId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if request.auth != null
+          && (request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.user1Id
+              || request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.user2Id);
       }
+    }
+    // OTPs: backend-only (Vercel API uses Admin SDK). Deny all client access.
+    match /verification_otps/{doc} {
+      allow read, write: if false;
     }
   }
 }

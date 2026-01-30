@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
 import '../models/user_profile.dart';
 import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
@@ -76,6 +77,9 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
+              try {
+                await ClerkAuth.of(context).signOut();
+              } catch (_) {}
               await _auth.signOut();
               if (context.mounted) {
                 Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);

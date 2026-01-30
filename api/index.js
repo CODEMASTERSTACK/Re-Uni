@@ -8,6 +8,7 @@ module.exports = async (req, res) => {
       'POST /api/get-custom-token',
       'POST /api/send-verification-otp',
       'POST /api/verify-university-email',
+      'POST /api/get-upload-url',
     ],
   });
 };

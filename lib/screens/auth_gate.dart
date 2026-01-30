@@ -37,7 +37,8 @@ class _AuthGateState extends State<AuthGate> {
     if (_syncing) return;
     setState(() { _syncing = true; _error = null; });
     try {
-      final token = await widget.authState.getToken();
+      final st = await widget.authState.sessionToken();
+      final token = (st is String ? st : (st as dynamic).token) as String?;
       if (token == null || token.isEmpty) {
         setState(() { _error = 'No session token'; _syncing = false; });
         return;
@@ -117,9 +118,11 @@ class _AuthGateState extends State<AuthGate> {
       if (user != null) {
         try {
           final emails = user.emailAddresses;
-          if (emails.isNotEmpty) email = emails.first.emailAddress;
+          if (emails != null && emails.isNotEmpty) {
+            email = emails.first.emailAddress;
+          }
         } catch (_) {}
-        fullName = user.fullName ?? '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim();
+        fullName = '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim();
         if (fullName.isEmpty) fullName = 'User';
       }
       return ProfileSetupScreen(

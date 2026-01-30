@@ -44,6 +44,10 @@ app.*.map.json
 .env.local
 .env.*.local
 
+# Local keys / secrets – never commit
+lib/keys.md
+**/keys.md
+
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile

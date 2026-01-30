@@ -56,4 +56,26 @@ class BackendService {
       throw Exception('verifyUniversityEmail failed: ${res.statusCode} ${res.body}');
     }
   }
+
+  /// Returns { uploadUrl, publicUrl } for uploading to R2. Path e.g. users/{userId}/profile/0.webp
+  Future<Map<String, String>> getUploadUrl(String path) async {
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null) throw Exception('Not signed in to Firebase');
+    final res = await http.post(
+      Uri.parse('$_base/api/get-upload-url'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({'path': path}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception('getUploadUrl failed: ${res.statusCode} ${res.body}');
+    }
+    final data = jsonDecode(res.body) as Map<String, dynamic>?;
+    final uploadUrl = data?['uploadUrl'] as String?;
+    final publicUrl = data?['publicUrl'] as String?;
+    if (uploadUrl == null || publicUrl == null) throw Exception('Invalid upload URL response');
+    return {'uploadUrl': uploadUrl, 'publicUrl': publicUrl};
+  }
 }

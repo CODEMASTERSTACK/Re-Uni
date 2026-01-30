@@ -30,9 +30,9 @@ const int kDiscoveryBatchSize = 20;
 /// Max profile images.
 const int kMaxProfileImages = 5;
 
-/// Backend API base URL (Vercel or any serverless). No trailing slash.
-/// Set via --dart-define=BACKEND_URL=... or use this default for local Vercel dev.
+/// Backend API base URL (Vercel). No trailing slash.
+/// Override with --dart-define=BACKEND_URL=... for local dev (e.g. http://localhost:3000).
 const String kBackendBaseUrl = String.fromEnvironment(
   'BACKEND_URL',
-  defaultValue: 'http://localhost:3000',
+  defaultValue: 'https://re-uni.vercel.app',
 );
