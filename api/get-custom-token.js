@@ -17,20 +17,20 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
-  const clerkToken = body.token;
-  if (!clerkToken || typeof clerkToken !== 'string') {
-    return res.status(400).json({ error: 'Missing token' });
-  }
-
-  const secretKey = process.env.CLERK_SECRET_KEY;
-  if (!secretKey) {
-    return res.status(500).json({ error: 'CLERK_SECRET_KEY not configured' });
-  }
-
   try {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+    const clerkToken = body.token;
+    if (!clerkToken || typeof clerkToken !== 'string') {
+      return res.status(400).json({ error: 'Missing token' });
+    }
+
+    const secretKey = process.env.CLERK_SECRET_KEY;
+    if (!secretKey) {
+      return res.status(500).json({ error: 'CLERK_SECRET_KEY not configured' });
+    }
+
     ensureFirebase();
     // Include your Flutter web app origin(s). Example: CLERK_AUTHORIZED_PARTIES=http://localhost:51806,http://localhost:3000
     const authorizedParties = process.env.CLERK_AUTHORIZED_PARTIES

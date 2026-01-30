@@ -48,3 +48,27 @@ Clerk lets you configure verification separately for **sign-up** vs **sign-in**.
 - **Sign-in:** Email/OTP verification **off** (returning users just enter password, no OTP).
 
 Exact labels may vary by Clerk version; if you don’t see “sign-in” vs “sign-up”, look for “Verification” or “Email verification” and any option that applies to existing users / sign-in and disable it for sign-in only.
+
+---
+
+## "Failed to fetch" when calling get-custom-token
+
+If you see **ClientException: Failed to fetch, uri=https://re-uni.vercel.app/api/get-custom-token**, the Flutter app is reaching the backend step but the request to the API is failing.
+
+**Check:**
+
+1. **Vercel deployment**
+   - Is the project deployed at `https://re-uni.vercel.app`? (Or your actual Vercel URL.)
+   - In the browser, open `https://re-uni.vercel.app/api` – you should see JSON with a list of endpoints. If you get an error or the page doesn’t load, the API isn’t deployed or the URL is wrong.
+
+2. **Environment variables**
+   - In Vercel Dashboard → Project → Settings → Environment Variables, set:
+     - `CLERK_SECRET_KEY` (from Clerk Dashboard → API Keys)
+     - `FIREBASE_SERVICE_ACCOUNT_JSON` (full JSON of the Firebase service account key as a single string)
+   - Redeploy after changing env vars.
+
+3. **Use the API locally (to rule out Vercel/network)**
+   - In the project root: `npm install` then `vercel dev` (or `npx vercel dev`).
+   - Run the Flutter web app with the local API:
+     - `flutter run -d chrome --dart-define=BACKEND_URL=http://localhost:3000`
+   - Log in again; the app will call `http://localhost:3000/api/get-custom-token` instead of Vercel. If it works locally, the issue is with the Vercel deployment or env vars.
