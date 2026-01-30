@@ -10,6 +10,7 @@ import 'screens/auth_screen.dart';
 
 import 'web_app_root.dart' show UniDateWebApp;
 import 'screens/landing_page.dart';
+import 'web_redirect_stub.dart' if (dart.library.html) 'web_redirect_web.dart' as web_redirect;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,9 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // On web, never build ClerkAuth (avoids path_provider/Platform crash). Use redirect-based auth.
   if (kIsWeb) {
-    runApp(const UniDateWebApp());
+    // Read Clerk callback token at the very start (from window.location) so we don't lose it.
+    final initialToken = web_redirect.getClerkCallbackToken();
+    runApp(UniDateWebApp(initialClerkToken: initialToken));
     return;
   }
   runApp(const MainApp());

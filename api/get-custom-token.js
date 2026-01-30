@@ -32,11 +32,13 @@ module.exports = async (req, res) => {
 
   try {
     ensureFirebase();
+    // Include your Flutter web app origin(s). Example: CLERK_AUTHORIZED_PARTIES=http://localhost:51806,http://localhost:3000
+    const authorizedParties = process.env.CLERK_AUTHORIZED_PARTIES
+      ? process.env.CLERK_AUTHORIZED_PARTIES.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['http://localhost:3000', 'http://localhost:8080', 'https://localhost'];
     const result = await verifyToken(clerkToken, {
       secretKey,
-      authorizedParties: process.env.CLERK_AUTHORIZED_PARTIES
-        ? process.env.CLERK_AUTHORIZED_PARTIES.split(',')
-        : ['http://localhost:3000', 'http://localhost:8080', 'https://localhost'],
+      authorizedParties,
     });
     const payload = result.data ?? result;
     const clerkUserId = payload?.sub;

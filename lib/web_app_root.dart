@@ -9,7 +9,10 @@ import 'screens/landing_page.dart';
 /// Web-only app root: never builds ClerkAuth, so no path_provider/Platform crash.
 /// Uses redirect to Clerk sign-in; on callback, exchanges token for Firebase and shows WebAuthGate.
 class UniDateWebApp extends StatefulWidget {
-  const UniDateWebApp({super.key});
+  /// Token read in main() from window.location so we don't lose it after redirect.
+  final String? initialClerkToken;
+
+  const UniDateWebApp({super.key, this.initialClerkToken});
 
   @override
   State<UniDateWebApp> createState() => _UniDateWebAppState();
@@ -23,21 +26,11 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
   String? _signedInUid;
   String? _error;
 
-  /// Token from Uri.base at startup (Flutter may see query params here before any navigation).
-  final String? _initialToken = () {
-    try {
-      final q = Uri.base.queryParameters;
-      return q['_clerk_db_jwt'] ?? q['_clerk_db_jwi'] ?? q['__clerk_ticket'] ?? q['token'] ?? q['code'];
-    } catch (_) {
-      return null;
-    }
-  }();
-
   @override
   void initState() {
     super.initState();
-    // If we already have a token (from Uri.base or cached at library load), start immediately.
-    if ((_initialToken ?? '').isNotEmpty) {
+    // If we have a token from main(), start exchange immediately.
+    if ((widget.initialClerkToken ?? '').isNotEmpty) {
       _handleCallback();
       return;
     }
@@ -47,11 +40,17 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
   }
 
   Future<void> _handleCallback() async {
-    String? token;
-    try {
-      token = web_redirect.getClerkCallbackToken() ?? _initialToken;
-    } catch (_) {
-      token = _initialToken;
+    String? token = widget.initialClerkToken;
+    if (token == null || token.isEmpty) {
+      try {
+        token = web_redirect.getClerkCallbackToken();
+      } catch (_) {}
+      if (token == null || token.isEmpty) {
+        try {
+          final q = Uri.base.queryParameters;
+          token = q['__clerk_db_jwt'] ?? q['_clerk_db_jwt'] ?? q['_clerk_db_jwi'] ?? q['__clerk_ticket'] ?? q['token'] ?? q['code'];
+        } catch (_) {}
+      }
     }
     if (token == null || token.isEmpty) {
       if (mounted) setState(() { _checkingCallback = false; });
@@ -128,12 +127,12 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
         ),
       );
     }
-    // About to show landing – re-check URL and initial token; if present we missed it, retry once.
-    String? tokenNow;
-    try {
-      tokenNow = web_redirect.getClerkCallbackToken() ?? Uri.base.queryParameters['_clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwi'] ?? _initialToken;
-    } catch (_) {
-      tokenNow = _initialToken;
+    // About to show landing – re-check token from main(), redirect helper, or Uri.base; retry once.
+    String? tokenNow = widget.initialClerkToken;
+    if (tokenNow == null || tokenNow.isEmpty) {
+      try {
+        tokenNow = web_redirect.getClerkCallbackToken() ?? Uri.base.queryParameters['__clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwi'];
+      } catch (_) {}
     }
     if (tokenNow != null && tokenNow.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

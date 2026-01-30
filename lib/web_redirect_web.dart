@@ -29,7 +29,7 @@ String? _seedTokenFromBrowser() {
     final href = html.window.location.href;
     if (href.isEmpty) return null;
     final uri = Uri.tryParse(href);
-    final t = uri?.queryParameters['_clerk_db_jwt'] ?? uri?.queryParameters['_clerk_db_jwi'] ??
+    final t = uri?.queryParameters['__clerk_db_jwt'] ?? uri?.queryParameters['_clerk_db_jwt'] ?? uri?.queryParameters['_clerk_db_jwi'] ??
         uri?.queryParameters['__clerk_ticket'] ?? uri?.queryParameters['token'] ?? uri?.queryParameters['code'];
     return (t != null && t.isNotEmpty) ? t : null;
   } catch (_) {
@@ -39,7 +39,7 @@ String? _seedTokenFromBrowser() {
 
 String? _tokenFromUri(Uri? uri) {
   if (uri == null || uri.queryParameters.isEmpty) return null;
-  final t = uri.queryParameters['_clerk_db_jwt'] ?? uri.queryParameters['_clerk_db_jwi'] ??
+  final t = uri.queryParameters['__clerk_db_jwt'] ?? uri.queryParameters['_clerk_db_jwt'] ?? uri.queryParameters['_clerk_db_jwi'] ??
       uri.queryParameters['__clerk_ticket'] ?? uri.queryParameters['token'] ?? uri.queryParameters['code'];
   return (t != null && t.isNotEmpty) ? t : null;
 }
@@ -50,7 +50,7 @@ String getCurrentBrowserUrl() {
 }
 
 /// Reads Clerk callback from current URL. Caches token on first successful read so redirect params aren't lost.
-/// Clerk may pass _clerk_db_jwt, __clerk_ticket, token, or code.
+/// Clerk may pass __clerk_db_jwt (two underscores), _clerk_db_jwt, __clerk_ticket, token, or code.
 String? getClerkCallbackToken() {
   try {
     // Return cached token if we already parsed it (URL may be normalized later and lose query params).
@@ -66,7 +66,7 @@ String? getClerkCallbackToken() {
     final search = html.window.location.search;
     final hash = html.window.location.hash;
     final q = _parseQuery(search ?? '');
-    final fromQuery = q['_clerk_db_jwt'] ?? q['_clerk_db_jwi'] ?? q['__clerk_ticket'] ?? q['token'] ?? q['code'];
+    final fromQuery = q['__clerk_db_jwt'] ?? q['_clerk_db_jwt'] ?? q['_clerk_db_jwi'] ?? q['__clerk_ticket'] ?? q['token'] ?? q['code'];
     if (fromQuery != null && fromQuery.isNotEmpty) {
       _cachedToken = fromQuery;
       return fromQuery;
