@@ -1,0 +1,160 @@
+import 'package:flutter/material.dart';
+import 'constants.dart';
+import 'services/auth_service.dart';
+import 'services/backend_service.dart';
+import 'web_auth_gate.dart';
+import 'web_redirect_stub.dart' if (dart.library.html) 'web_redirect_web.dart' as web_redirect;
+import 'screens/landing_page.dart';
+
+/// Web-only app root: never builds ClerkAuth, so no path_provider/Platform crash.
+/// Uses redirect to Clerk sign-in; on callback, exchanges token for Firebase and shows WebAuthGate.
+class UniDateWebApp extends StatefulWidget {
+  const UniDateWebApp({super.key});
+
+  @override
+  State<UniDateWebApp> createState() => _UniDateWebAppState();
+}
+
+class _UniDateWebAppState extends State<UniDateWebApp> {
+  final AuthService _auth = AuthService();
+  final BackendService _backend = BackendService();
+
+  bool _checkingCallback = true;
+  String? _signedInUid;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Run after first frame so the browser's URL (including query params from Clerk redirect) is stable.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _handleCallback();
+    });
+  }
+
+  Future<void> _handleCallback() async {
+    final token = web_redirect.getClerkCallbackToken();
+    if (token == null || token.isEmpty) {
+      if (mounted) setState(() { _checkingCallback = false; });
+      return;
+    }
+    try {
+      final customToken = await _backend.getCustomToken(token);
+      await _auth.signInWithCustomToken(customToken);
+      final uid = _auth.clerkIdFromFirebase;
+      if (mounted && uid != null) {
+        setState(() {
+          _checkingCallback = false;
+          _signedInUid = uid;
+        });
+      } else if (mounted) {
+        setState(() { _checkingCallback = false; _error = 'Firebase sign-in failed'; });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() { _checkingCallback = false; _error = e.toString(); });
+      }
+    }
+  }
+
+  void _goToClerkSignIn({required bool isSignUp}) {
+    final base = kClerkWebSignInUrl.split('?').first;
+    final path = isSignUp ? base.replaceFirst(RegExp(r'sign-in$'), 'sign-up') : base;
+    final redirectUri = Uri.base.replace(path: '', queryParameters: {}, fragment: '');
+    final url = '$path?redirect_url=${Uri.encodeComponent(redirectUri.toString())}';
+    web_redirect.redirectToClerkSignIn(url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checkingCallback) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFFFF4458)),
+                const SizedBox(height: 16),
+                Text(
+                  'Loading...',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    if (_signedInUid != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: WebAuthGate(userId: _signedInUid!),
+      );
+    }
+    if (_error != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => setState(() { _error = null; _checkingCallback = true; _handleCallback(); }),
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    // About to show landing – re-check URL; if token is present we missed it (e.g. timing), retry once.
+    // Check both redirect helper and Uri.base so we catch the token even if one source fails.
+    final tokenNow = web_redirect.getClerkCallbackToken() ?? Uri.base.queryParameters['_clerk_db_jwt'] ?? Uri.base.queryParameters['_clerk_db_jwi'];
+    if (tokenNow != null && tokenNow.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() { _checkingCallback = true; });
+          _handleCallback();
+        }
+      });
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Color(0xFFFF4458)),
+                const SizedBox(height: 16),
+                Text('Signing you in...', style: TextStyle(color: Colors.white70)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      initialRoute: '/',
+      routes: {
+        '/': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
+        '/sign-in': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
+        '/sign-up': (context) => LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false)),
+      },
+    );
+  }
+}
+

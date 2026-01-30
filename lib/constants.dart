@@ -36,3 +36,11 @@ const String kBackendBaseUrl = String.fromEnvironment(
   'BACKEND_URL',
   defaultValue: 'https://re-uni.vercel.app',
 );
+
+/// Clerk Account Portal sign-in URL for web redirect flow.
+/// Matches your Frontend API slug (working-turtle-74); Account Portal uses accounts.dev.
+/// Override with --dart-define=CLERK_WEB_SIGN_IN_URL=... if needed.
+const String kClerkWebSignInUrl = String.fromEnvironment(
+  'CLERK_WEB_SIGN_IN_URL',
+  defaultValue: 'https://working-turtle-74.accounts.dev/sign-in',
+);
