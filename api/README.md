@@ -19,7 +19,9 @@ Replaces Firebase Cloud Functions. Deploy to Vercel (free tier) and set environm
    |----------|-------------|
    | `CLERK_SECRET_KEY` | From Clerk Dashboard → API Keys |
    | `FIREBASE_SERVICE_ACCOUNT_JSON` | Full JSON of your Firebase service account key (Project Settings → Service accounts → Generate new private key). Paste as a single-line string. |
-   | `BREVO_API_KEY` | (Optional) For sending OTP emails. Without it, OTP is only stored and can be read from logs for testing. |
+   | `BREVO_API_KEY` | **Required for OTP emails.** For student verification, users receive the code by email only if this is set. Without it, OTP is stored in Firestore but no email is sent. See [docs/VERIFICATION_OTP_EMAIL.md](../docs/VERIFICATION_OTP_EMAIL.md). |
+   | `BREVO_SENDER_EMAIL` | (Optional) Sender email for OTP (default: `noreply@unidate.app`). Use a Brevo-verified address. |
+   | `BREVO_SENDER_NAME` | (Optional) Sender name (default: `UniDate`). |
    | `CLERK_AUTHORIZED_PARTIES` | (Optional) Comma-separated origins, e.g. `https://your-app.web.app,http://localhost:8080` |
    | **R2 (profile images)** | |
    | `R2_ACCOUNT_ID` | Cloudflare account ID (Dashboard → R2 → right sidebar) |

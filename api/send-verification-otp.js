@@ -50,11 +50,13 @@ module.exports = async (req, res) => {
 
   const apiKey = process.env.BREVO_API_KEY;
   if (apiKey) {
+    const senderEmail = process.env.BREVO_SENDER_EMAIL || 'noreply@unidate.app';
+    const senderName = process.env.BREVO_SENDER_NAME || 'UniDate';
     const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: { 'accept': 'application/json', 'content-type': 'application/json', 'api-key': apiKey },
       body: JSON.stringify({
-        sender: { name: 'UniDate', email: 'noreply@unidate.app' },
+        sender: { name: senderName, email: senderEmail },
         to: [{ email }],
         subject: 'UniDate – Your verification code',
         htmlContent: `<p>Your code is: <strong>${otp}</strong>. It expires in 10 minutes.</p>`,

@@ -1,9 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users: read/write own document only. uid from Firebase Auth (set via custom token = Clerk ID).
+    // Users: any authenticated user can read profiles (for discovery/swipe feed); only own document writable.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
     // Config: read-only for all authenticated. Allow create for config/interests only when missing (app seeds it).
     match /config/interests {

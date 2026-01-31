@@ -26,7 +26,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     _loadBatch();
   }
 
-  Future<void> _loadBatch() async {
+  Future<void> _loadBatch({bool isRetry = false}) async {
     if (!mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
@@ -59,6 +59,12 @@ class _SwipeScreenState extends State<SwipeScreen> {
         _error = null;
       });
     } catch (e) {
+      // Often permission-denied on first load (token not ready); retry once after a short delay.
+      if (!isRetry && mounted) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        if (mounted) _loadBatch(isRetry: true);
+        return;
+      }
       if (mounted) {
         setState(() {
           _loading = false;
