@@ -10,6 +10,7 @@ Use this when env vars are set in Vercel but you still get **401 "Invalid Clerk 
 |--------------|--------|
 | **Failed to fetch** (no status code) | Request never reached the API: **CORS** (preflight missing headers), wrong URL, or network. If the **preflight OPTIONS** returns **404**, the API isn’t deployed—see [VERCEL_404_FIX.md](VERCEL_404_FIX.md) (usually **Root Directory** in Vercel must be repo root so `api/` is included). |
 | **401 + "Invalid Clerk token"** | Request reached the API; Clerk JWT verification failed (see below). |
+| **401 + "The provided Clerk Secret Key is invalid"** | **CLERK_SECRET_KEY** in Vercel is wrong: use the **Secret Key** (`sk_test_...` or `sk_live_...`) from Clerk Dashboard → API Keys, **not** the Publishable Key (`pk_...`). Must be from the **same** Clerk app as your bridge. Redeploy after changing. |
 | **401 + `detail`** | Same as above; the `detail` field may hint at cause (e.g. `azp` mismatch). |
 | **500 + "Backend config error"** | Firebase env problem: `FIREBASE_SERVICE_ACCOUNT_JSON` missing or invalid JSON. |
 | **500 + "CLERK_SECRET_KEY not configured"** | `CLERK_SECRET_KEY` not set for the environment you’re hitting (e.g. Preview). |
@@ -28,7 +29,7 @@ When the Flutter app runs on **http://localhost:54623** (or any port) and calls 
 
 | Variable | Required | Scope | What to set |
 |----------|----------|--------|-------------|
-| `CLERK_SECRET_KEY` | Yes | **Production** (and Preview if you test preview URLs) | From Clerk Dashboard → API Keys. Use `sk_test_...` for development. |
+| `CLERK_SECRET_KEY` | Yes | **Production** (and Preview if you test preview URLs) | **Secret Key** from Clerk Dashboard → API Keys: `sk_test_...` (dev) or `sk_live_...` (prod). **Not** the Publishable Key (`pk_...`). Must match the Clerk instance that issued the JWT (same app as your bridge). |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Yes | **Production** (and Preview if needed) | **Full** Firebase service account JSON as a **single-line** string (no newlines). From Firebase Console → Project Settings → Service accounts → Generate new private key. |
 | `CLERK_AUTHORIZED_PARTIES` | Optional | Same as above | Comma-separated origins. If **not** set, the API uses a default list that includes `https://re-uni.vercel.app` and the Clerk portal. Set this **only** if you use a different app URL (e.g. custom domain). |
 
@@ -47,8 +48,9 @@ Clerk’s `verifyToken` can fail for:
 
 2. **`azp` (authorized party) not allowed**  
    The JWT’s `azp` claim must be in `authorizedParties`.  
-   - If you **don’t** set `CLERK_AUTHORIZED_PARTIES` in Vercel, the API now includes `https://re-uni.vercel.app` in the default list.  
-   - If your Flutter app is served from a **different** URL (e.g. custom domain or another Vercel URL), add that URL to **`CLERK_AUTHORIZED_PARTIES`** in Vercel, e.g.  
+   - If you **don’t** set `CLERK_AUTHORIZED_PARTIES` in Vercel, the API uses a default list that includes common localhost ports (e.g. 3000, 5173, 55926, **58633**) and `https://re-uni.vercel.app`.  
+   - **Flutter web** uses a random port each run (e.g. `http://localhost:58633`). The default list includes 58633; if you get "Invalid JWT Authorized party claim (azp)" with a **different** port (e.g. 60123), set **`CLERK_AUTHORIZED_PARTIES`** in Vercel to include it: `http://localhost:60123` (or add that port to the default list in `api/get-custom-token.js` and redeploy).  
+   - If your app is served from a **different** URL (e.g. custom domain), add it to **`CLERK_AUTHORIZED_PARTIES`**, e.g.  
      `https://your-app.vercel.app,https://working-turtle-74.accounts.dev`
 
 3. **Expired or malformed token**  

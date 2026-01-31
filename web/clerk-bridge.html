@@ -20,9 +20,16 @@
     <p id="err" class="err" style="display:none;"></p>
     <p id="link" style="display:none;"><a id="appLink" href="/">Continue to app</a></p>
   </div>
-  <script src="https://unpkg.com/@clerk/clerk-js@latest/dist/clerk.browser.js" crossorigin="anonymous"></script>
+  <!-- Clerk docs: use data-clerk-publishable-key and load from YOUR_FRONTEND_API_URL so the key is read correctly. -->
+  <script
+    id="clerk-script"
+    crossorigin="anonymous"
+    data-clerk-publishable-key="pk_test_d29ya2luZy10dXJ0bGUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA"
+    src="https://working-turtle-74.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js"
+    type="text/javascript"
+  ></script>
   <script>
-    (async function() {
+    (function() {
       var appOrigin = location.origin;
       var appRoot = appOrigin + '/';
       function goToApp(jwt) {
@@ -37,27 +44,49 @@
         var a = document.getElementById('appLink');
         if (a) a.href = appRoot;
       }
-      try {
+      var publishableKey = 'pk_test_d29ya2luZy10dXJ0bGUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA';
+      function run() {
         if (typeof window.Clerk === 'undefined') {
-          showErr('Clerk failed to load.');
+          showErr('Clerk script did not load. Check the script URL and data-clerk-publishable-key.');
           return;
         }
-        var publishableKey = 'pk_test_d29ya2luZy10dXJ0bGUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA';
-        var clerk = new window.Clerk(publishableKey);
-        await clerk.load();
-        var session = clerk.session;
-        if (!session) {
-          showErr('No session after sign-in. Try again or continue to app.');
-          return;
-        }
-        var token = await session.getToken();
-        if (token) {
-          goToApp(token);
+        var clerk = window.Clerk;
+        var isConstructor = typeof clerk === 'function';
+        var promise;
+        if (isConstructor) {
+          try {
+            var instance = new clerk(publishableKey);
+            promise = instance.load();
+            clerk = instance;
+          } catch (e) {
+            showErr(e && e.message ? e.message : 'Clerk init failed.');
+            return;
+          }
         } else {
-          showErr('Could not get session token.');
+          promise = clerk.load ? clerk.load() : Promise.resolve();
         }
-      } catch (e) {
-        showErr(e && e.message ? e.message : 'Something went wrong.');
+        Promise.resolve(promise).then(function() {
+          var session = clerk.session;
+          if (!session) {
+            showErr('No session after sign-in. Try again or continue to app.');
+            return;
+          }
+          var getToken = session.getToken;
+          if (typeof getToken !== 'function') {
+            showErr('Could not get session token.');
+            return;
+          }
+          return getToken.call(session);
+        }).then(function(token) {
+          if (token) goToApp(token);
+        }).catch(function(e) {
+          showErr(e && e.message ? e.message : 'Something went wrong.');
+        });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+      } else {
+        run();
       }
     })();
   </script>

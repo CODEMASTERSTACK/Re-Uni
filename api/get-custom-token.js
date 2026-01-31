@@ -40,11 +40,11 @@ module.exports = async (req, res) => {
     }
 
     ensureFirebase();
-    // Clerk JWT azp (authorized party) must include your app origin and Clerk portal. Add production URL to avoid 401.
+    // Clerk JWT azp (authorized party) must include your app origin. Flutter web uses random ports (e.g. 58633).
     const defaultParties = [
       'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5173',
       'http://localhost:51806', 'http://localhost:55926', 'http://localhost:57188',
-      'http://localhost:52297', 'https://localhost',
+      'http://localhost:52297', 'http://localhost:58633', 'https://localhost',
       'https://working-turtle-74.accounts.dev', 'https://working-turtle-74.clerk.accounts.dev',
       'https://re-uni.vercel.app',
     ];

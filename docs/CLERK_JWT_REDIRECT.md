@@ -30,10 +30,20 @@ So the flow is:
 - Bridge loads Clerk.js, gets JWT via `getToken()`, redirects to **app root** with `__clerk_db_jwt=<jwt>`  
 - App reads `__clerk_db_jwt`, calls backend, gets Firebase custom token, signs in.
 
-## If you use a different Clerk publishable key
+## "Missing publishableKey" on the bridge
 
-The bridge page uses this default publishable key (same as in `lib/main.dart`):
+If the bridge shows "Clerk failed to load" or the console says **Missing publishableKey**, the Clerk script is not getting the key. Causes and fixes:
 
-`pk_test_d29ya2luZy10dXJ0bGUtNzQuY2xlcmsuYWNjb3VudHMuZGV2JA`
+1. **Use Clerk’s CDN and `data-clerk-publishable-key`**  
+   The bridge must load Clerk from **your Frontend API URL** (e.g. `https://<slug>.clerk.accounts.dev/npm/@clerk/clerk-js@5/dist/clerk.browser.js`) with the attribute **`data-clerk-publishable-key="pk_..."`** on the script tag. Loading from unpkg or passing the key only in `new Clerk(...)` can trigger "Missing publishableKey" in some builds.
 
-If your app uses a **different** publishable key (e.g. production or another instance), edit `web/clerk-bridge.html` and set the `publishableKey` variable to your key so the bridge talks to the correct Clerk instance.
+2. **Correct Frontend API URL**  
+   The script `src` must use your instance’s domain. For `working-turtle-74` it is `https://working-turtle-74.clerk.accounts.dev/...`. If your Clerk slug is different, get the Frontend API URL from Clerk Dashboard → API Keys and update the script `src` in `web/clerk-bridge.html`.
+
+3. **Key in two places**  
+   The same publishable key must be in:
+   - `data-clerk-publishable-key="pk_..."`
+   - The `publishableKey` variable used in the fallback `new Clerk(publishableKey)` (constructor expects the **string** key as first argument in the UMD build).
+
+4. **Different publishable key**  
+   If your app uses a different key (e.g. production), edit `web/clerk-bridge.html`: set both the `data-clerk-publishable-key` attribute and the `publishableKey` variable to that key, and use the matching Frontend API URL in the script `src`.
