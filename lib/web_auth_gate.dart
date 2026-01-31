@@ -9,8 +9,16 @@ import '../screens/app_shell.dart';
 /// Used after redirect callback when we already signed in with Firebase custom token.
 class WebAuthGate extends StatefulWidget {
   final String userId;
+  /// Name/email from Clerk callback so profile setup shows the name user gave at sign-up.
+  final String? initialName;
+  final String? initialEmail;
 
-  const WebAuthGate({super.key, required this.userId});
+  const WebAuthGate({
+    super.key,
+    required this.userId,
+    this.initialName,
+    this.initialEmail,
+  });
 
   @override
   State<WebAuthGate> createState() => _WebAuthGateState();
@@ -100,8 +108,8 @@ class _WebAuthGateState extends State<WebAuthGate> {
     if (needsSetup) {
       return ProfileSetupScreen(
         clerkId: widget.userId,
-        email: 'user@example.com',
-        fullName: 'User',
+        email: widget.initialEmail?.isNotEmpty == true ? widget.initialEmail! : 'user@example.com',
+        fullName: widget.initialName?.isNotEmpty == true ? widget.initialName! : 'User',
       );
     }
     return AppShell(userId: widget.userId);

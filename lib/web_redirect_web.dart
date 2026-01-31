@@ -26,14 +26,22 @@ Map<String, String> _parseQuery(String search) {
   return q;
 }
 
-/// Token parsed from URL – seeded as soon as library loads so we don't lose it after redirect.
+/// Token and user info parsed from URL – seeded as soon as library loads so we don't lose them after redirect.
 String? _cachedToken = _seedTokenFromBrowser();
+String? _cachedName;
+String? _cachedEmail;
 
 String? _seedTokenFromBrowser() {
   try {
     final href = html.window.location.href;
     if (href.isEmpty) return null;
     final uri = Uri.tryParse(href);
+    if (uri != null && uri.queryParameters.isNotEmpty) {
+      _cachedName = uri.queryParameters['__clerk_name'] ?? uri.queryParameters['_clerk_name'];
+      if (_cachedName != null && _cachedName!.isEmpty) _cachedName = null;
+      _cachedEmail = uri.queryParameters['__clerk_email'] ?? uri.queryParameters['_clerk_email'];
+      if (_cachedEmail != null && _cachedEmail!.isEmpty) _cachedEmail = null;
+    }
     final t = uri?.queryParameters['__clerk_db_jwt'] ?? uri?.queryParameters['_clerk_db_jwt'] ?? uri?.queryParameters['_clerk_db_jwi'] ??
         uri?.queryParameters['__clerk_ticket'] ?? uri?.queryParameters['token'] ?? uri?.queryParameters['code'];
     return (t != null && t.isNotEmpty) ? t : null;
@@ -52,6 +60,27 @@ String? _tokenFromUri(Uri? uri) {
 /// Full current URL from the browser.
 String getCurrentBrowserUrl() {
   return html.window.location.href;
+}
+
+/// Name and email from Clerk callback URL (set by clerk-bridge after sign-in).
+String? getClerkCallbackName() {
+  if (_cachedName != null && _cachedName!.isNotEmpty) return _cachedName;
+  try {
+    final uri = Uri.tryParse(html.window.location.href);
+    final n = uri?.queryParameters['__clerk_name'] ?? uri?.queryParameters['_clerk_name'];
+    if (n != null && n.isNotEmpty) { _cachedName = n; return n; }
+  } catch (_) {}
+  return null;
+}
+
+String? getClerkCallbackEmail() {
+  if (_cachedEmail != null && _cachedEmail!.isNotEmpty) return _cachedEmail;
+  try {
+    final uri = Uri.tryParse(html.window.location.href);
+    final e = uri?.queryParameters['__clerk_email'] ?? uri?.queryParameters['_clerk_email'];
+    if (e != null && e.isNotEmpty) { _cachedEmail = e; return e; }
+  } catch (_) {}
+  return null;
 }
 
 /// Removes Clerk callback params from the URL so a refresh doesn't retry an expired token.

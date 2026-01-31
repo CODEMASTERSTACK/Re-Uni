@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../models/match_record.dart';
@@ -18,6 +19,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
   List<MatchRecord> _matches = [];
   Map<String, UserProfile> _profiles = {};
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -26,29 +28,42 @@ class _MatchesScreenState extends State<MatchesScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final matches = await _firestore.getMatchesForUser(widget.userId);
-    final profiles = <String, UserProfile>{};
-    for (final m in matches) {
-      final otherId = m.user1Id == widget.userId ? m.user2Id : m.user1Id;
-      if (!profiles.containsKey(otherId)) {
-        final p = await _firestore.getUserProfile(otherId);
-        if (p != null) profiles[otherId] = p;
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) await firebaseUser.getIdToken(true);
+      final matches = await _firestore.getMatchesForUser(widget.userId);
+      final profiles = <String, UserProfile>{};
+      for (final m in matches) {
+        final otherId = m.user1Id == widget.userId ? m.user2Id : m.user1Id;
+        if (!profiles.containsKey(otherId)) {
+          final p = await _firestore.getUserProfile(otherId);
+          if (p != null) profiles[otherId] = p;
+        }
       }
+      if (!mounted) return;
+      setState(() {
+        _matches = matches;
+        _profiles = profiles;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }
-    setState(() {
-      _matches = matches;
-      _profiles = profiles;
-      _loading = false;
-    });
   }
 
   Future<void> _accept(MatchRecord m) async {
     final matchId = MatchRecord.docId(m.user1Id, m.user2Id);
-    if (m.status != 'matched') return;
+    final otherId = m.user1Id == widget.userId ? m.user2Id : m.user1Id;
+    // If pending (they liked me), my Accept = add my like → mutual match, then open chat.
+    if (m.status == 'pending') {
+      await _firestore.upsertMatchOnLike(widget.userId, otherId);
+      if (!mounted) return;
+    }
     await _firestore.createChatIfMatched(matchId, m.user1Id, m.user2Id);
     if (!mounted) return;
-    final otherId = m.user1Id == widget.userId ? m.user2Id : m.user1Id;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ChatThreadScreen(
@@ -63,15 +78,42 @@ class _MatchesScreenState extends State<MatchesScreen> {
   Future<void> _reject(MatchRecord m) async {
     final matchId = MatchRecord.docId(m.user1Id, m.user2Id);
     await _firestore.rejectMatch(matchId, widget.userId);
+    if (!mounted) return;
     _load();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading && _error == null) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Color(0xFFFF4458))),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Matches', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Couldn\'t load matches.', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _load,
+                  child: const Text('Retry', style: TextStyle(color: Color(0xFFFF4458))),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
     final pending = _matches.where((m) => m.status == 'pending').toList();

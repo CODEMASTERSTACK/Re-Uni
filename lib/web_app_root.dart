@@ -13,8 +13,16 @@ import 'screens/landing_page.dart';
 class UniDateWebApp extends StatefulWidget {
   /// Token read in main() from window.location so we don't lose it after redirect.
   final String? initialClerkToken;
+  /// Name/email from Clerk callback (clerk-bridge) so profile setup shows the name user gave at sign-up.
+  final String? initialClerkName;
+  final String? initialClerkEmail;
 
-  const UniDateWebApp({super.key, this.initialClerkToken});
+  const UniDateWebApp({
+    super.key,
+    this.initialClerkToken,
+    this.initialClerkName,
+    this.initialClerkEmail,
+  });
 
   @override
   State<UniDateWebApp> createState() => _UniDateWebAppState();
@@ -171,7 +179,11 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
       );
     }
     if (_signedInUid != null) {
-      return WebAuthGate(userId: _signedInUid!);
+      return WebAuthGate(
+        userId: _signedInUid!,
+        initialName: widget.initialClerkName,
+        initialEmail: widget.initialClerkEmail,
+      );
     }
     if (_error != null) {
       final isSessionExpired = _error!.contains('Session expired');

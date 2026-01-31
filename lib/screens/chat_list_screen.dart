@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../models/chat.dart';
@@ -18,6 +19,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<ChatRecord> _chats = [];
   Map<String, UserProfile> _profiles = {};
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -26,29 +28,64 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final chats = await _firestore.getChatsForUser(widget.userId);
-    final profiles = <String, UserProfile>{};
-    for (final c in chats) {
-      final otherId = c.otherUserId(widget.userId);
-      if (!profiles.containsKey(otherId)) {
-        final p = await _firestore.getUserProfile(otherId);
-        if (p != null) profiles[otherId] = p;
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) await firebaseUser.getIdToken(true);
+      final chats = await _firestore.getChatsForUser(widget.userId);
+      final profiles = <String, UserProfile>{};
+      for (final c in chats) {
+        final otherId = c.otherUserId(widget.userId);
+        if (!profiles.containsKey(otherId)) {
+          final p = await _firestore.getUserProfile(otherId);
+          if (p != null) profiles[otherId] = p;
+        }
       }
+      if (!mounted) return;
+      setState(() {
+        _chats = chats;
+        _profiles = profiles;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = e.toString(); });
     }
-    setState(() {
-      _chats = chats;
-      _profiles = profiles;
-      _loading = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading && _error == null) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Color(0xFFFF4458))),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Chat', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Couldn\'t load chats.', style: TextStyle(color: Colors.white70)),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: _load,
+                  child: const Text('Retry', style: TextStyle(color: Color(0xFFFF4458))),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
     return Scaffold(

@@ -162,6 +162,7 @@ Profiles are shown to users based on the following priority rules:
 2. Fallback Randomization: If no interest-matched profiles are available, random profiles are shown
 3. Gender-Based Filtering:
 
+
    * Male users are shown female profiles
    * Female users are shown male profiles
 

@@ -157,6 +157,7 @@ class FirestoreService {
     final list = <MatchRecord>[];
     for (final doc in q.docs) {
       final data = doc.data();
+      if (data['status'] == 'rejected') continue;
       final rejectedBy = data['rejectedBy'] as String?;
       if (rejectedBy == userId) continue;
       list.add(MatchRecord.fromMap(data, doc.id));

@@ -18,9 +18,15 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // On web, never build ClerkAuth (avoids path_provider/Platform crash). Use redirect-based auth.
   if (kIsWeb) {
-    // Read Clerk callback token at the very start (from window.location) so we don't lose it.
+    // Read Clerk callback token and user info at the very start (from window.location) so we don't lose them.
     final initialToken = web_redirect.getClerkCallbackToken();
-    runApp(UniDateWebApp(initialClerkToken: initialToken));
+    final initialName = web_redirect.getClerkCallbackName();
+    final initialEmail = web_redirect.getClerkCallbackEmail();
+    runApp(UniDateWebApp(
+      initialClerkToken: initialToken,
+      initialClerkName: initialName,
+      initialClerkEmail: initialEmail,
+    ));
     return;
   }
   runApp(const MainApp());

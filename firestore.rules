@@ -16,9 +16,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
-    // Swipes: actor can create/read own swipes; need to allow read for target for "who liked me".
+    // Swipes: actor can create; only actor or target can read (least privilege).
     match /swipes/{swipeId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && (resource.data.actorId == request.auth.uid || resource.data.targetId == request.auth.uid);
       allow create: if request.auth != null && request.resource.data.actorId == request.auth.uid;
       allow update, delete: if false;
     }

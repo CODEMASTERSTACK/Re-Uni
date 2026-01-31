@@ -14,3 +14,7 @@ void clearClerkCallbackFromUrl() {}
 
 /// Returns token/code from URL callback, or null. Web only.
 String? getClerkCallbackToken() => null;
+
+/// Name/email from Clerk callback URL. Web only.
+String? getClerkCallbackName() => null;
+String? getClerkCallbackEmail() => null;

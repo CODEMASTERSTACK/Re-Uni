@@ -79,10 +79,22 @@ class _SwipeScreenState extends State<SwipeScreen> {
   Future<void> _swipe(String action) async {
     if (_currentProfile == null) return;
     final targetId = _currentProfile!.clerkId;
-    await _firestore.recordSwipe(widget.userId, targetId, action);
-    await _firestore.upsertMatchOnLike(widget.userId, targetId);
-    if (action == 'like') {
-      await _firestore.incrementSwipeCount(widget.userId);
+    try {
+      // Ensure auth token is ready so Firestore rules see request.auth (avoids permission-denied on web).
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser != null) await firebaseUser.getIdToken(true);
+      await _firestore.recordSwipe(widget.userId, targetId, action);
+      if (action == 'like') {
+        await _firestore.upsertMatchOnLike(widget.userId, targetId);
+        await _firestore.incrementSwipeCount(widget.userId);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Swipe failed. Try again.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
     }
     if (!mounted) return;
     setState(() {

@@ -32,8 +32,12 @@
     (function() {
       var appOrigin = location.origin;
       var appRoot = appOrigin + '/';
-      function goToApp(jwt) {
-        var url = jwt ? (appRoot + '?__clerk_db_jwt=' + encodeURIComponent(jwt)) : (appRoot + (location.search || ''));
+      function goToApp(jwt, name, email) {
+        var params = [];
+        if (jwt) params.push('__clerk_db_jwt=' + encodeURIComponent(jwt));
+        if (name) params.push('__clerk_name=' + encodeURIComponent(name));
+        if (email) params.push('__clerk_email=' + encodeURIComponent(email));
+        var url = params.length ? (appRoot + '?' + params.join('&')) : (appRoot + (location.search || ''));
         location.replace(url);
       }
       function showErr(msg) {
@@ -71,14 +75,24 @@
             showErr('No session after sign-in. Try again or continue to app.');
             return;
           }
+          var user = session.user;
+          var name = '';
+          var email = '';
+          if (user) {
+            var first = (user.firstName != null) ? String(user.firstName) : '';
+            var last = (user.lastName != null) ? String(user.lastName) : '';
+            name = (first + ' ' + last).trim() || '';
+            var primary = user.primaryEmailAddress;
+            if (primary && primary.emailAddress) email = String(primary.emailAddress);
+          }
           var getToken = session.getToken;
           if (typeof getToken !== 'function') {
             showErr('Could not get session token.');
             return;
           }
-          return getToken.call(session);
-        }).then(function(token) {
-          if (token) goToApp(token);
+          return getToken.call(session).then(function(token) {
+            if (token) goToApp(token, name, email);
+          });
         }).catch(function(e) {
           showErr(e && e.message ? e.message : 'Something went wrong.');
         });
