@@ -8,7 +8,7 @@ Use this when env vars are set in Vercel but you still get **401 "Invalid Clerk 
 
 | What you see | Meaning |
 |--------------|--------|
-| **Failed to fetch** (no status code) | Request never reached the API: **CORS** (preflight missing headers), wrong URL, or network. Ensure `vercel.json` has a `headers` entry for `/api/(.*)` with CORS headers so the OPTIONS preflight gets them. |
+| **Failed to fetch** (no status code) | Request never reached the API: **CORS** (preflight missing headers), wrong URL, or network. If the **preflight OPTIONS** returns **404**, the API isn’t deployed—see [VERCEL_404_FIX.md](VERCEL_404_FIX.md) (usually **Root Directory** in Vercel must be repo root so `api/` is included). |
 | **401 + "Invalid Clerk token"** | Request reached the API; Clerk JWT verification failed (see below). |
 | **401 + `detail`** | Same as above; the `detail` field may hint at cause (e.g. `azp` mismatch). |
 | **500 + "Backend config error"** | Firebase env problem: `FIREBASE_SERVICE_ACCOUNT_JSON` missing or invalid JSON. |

@@ -1,10 +1,11 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/*.js", "use": "@vercel/node" }
-  ],
   "rewrites": [
-    { "source": "/", "destination": "/api" }
+    { "source": "/", "destination": "/api" },
+    { "source": "/api/get-custom-token", "destination": "/api/get-custom-token" },
+    { "source": "/api/send-verification-otp", "destination": "/api/send-verification-otp" },
+    { "source": "/api/verify-university-email", "destination": "/api/verify-university-email" },
+    { "source": "/api/get-upload-url", "destination": "/api/get-upload-url" }
   ],
   "headers": [
     {
