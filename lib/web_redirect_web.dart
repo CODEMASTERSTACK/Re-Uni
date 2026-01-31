@@ -5,6 +5,11 @@ void redirectToClerkSignIn(String url) {
   html.window.location.href = url;
 }
 
+/// Redirects to clerk-signout.html so Clerk session is cleared; that page signs out and redirects back to app.
+void redirectToClerkSignOut() {
+  html.window.location.href = '/clerk-signout.html';
+}
+
 /// Parses query string (e.g. "?a=1&b=2" or "a=1&b=2") into a map.
 Map<String, String> _parseQuery(String search) {
   final q = <String, String>{};
@@ -47,6 +52,17 @@ String? _tokenFromUri(Uri? uri) {
 /// Full current URL from the browser.
 String getCurrentBrowserUrl() {
   return html.window.location.href;
+}
+
+/// Removes Clerk callback params from the URL so a refresh doesn't retry an expired token.
+void clearClerkCallbackFromUrl() {
+  try {
+    _cachedToken = null;
+    final u = Uri.parse(html.window.location.href);
+    if (u.queryParameters.isEmpty) return;
+    final clean = u.replace(path: u.path.isEmpty ? '/' : u.path, queryParameters: {}, fragment: '');
+    html.window.history.replaceState(null, '', clean.toString());
+  } catch (_) {}
 }
 
 /// Reads Clerk callback from current URL. Caches token on first successful read so redirect params aren't lost.

@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'constants.dart';
 import 'services/auth_service.dart';
@@ -25,18 +27,75 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
   bool _checkingCallback = true;
   String? _signedInUid;
   String? _error;
+  /// When true, user tapped "Sign in again" on session-expired; show landing and ignore URL token.
+  bool _userChoseLanding = false;
+  StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
-    // If we have a token from main(), start exchange immediately.
-    if ((widget.initialClerkToken ?? '').isNotEmpty) {
-      _handleCallback();
+    _initAuth();
+    // When user signs out, clear signed-in state so we show landing instead of WebAuthGate (avoids permission-denied).
+    _authSubscription = _auth.authStateChanges.listen((User? user) {
+      if (user == null && mounted && _signedInUid != null) {
+        setState(() {
+          _signedInUid = null;
+          _checkingCallback = false;
+          _error = null;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Ensures the Firebase ID token is ready so Firestore requests have request.auth set.
+  /// Call after we have currentUser but before any Firestore access (e.g. after refresh).
+  Future<void> _ensureAuthTokenReady(User user) async {
+    try {
+      await user.getIdToken(true);
+    } catch (_) {}
+  }
+
+  /// Prefer persisted Firebase session. Give Firebase a moment to restore from storage
+  /// before trying Clerk token from URL, so refresh keeps the user logged in.
+  Future<void> _initAuth() async {
+    // 1) First emission: might be restored user or null (persistence not ready yet).
+    User? user;
+    try {
+      user = await _auth.authStateChanges.first;
+    } catch (_) {}
+    if (!mounted) return;
+    if (user != null) {
+      await _ensureAuthTokenReady(user);
+      if (!mounted) return;
+      final uid = user.uid;
+      setState(() {
+        _signedInUid = uid;
+        _checkingCallback = false;
+      });
       return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _handleCallback();
-    });
+    // 2) On web, persistence can restore slightly later; give it a short moment.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+    user = _auth.currentFirebaseUser;
+    if (user != null) {
+      await _ensureAuthTokenReady(user);
+      if (!mounted) return;
+      final uid = user.uid;
+      setState(() {
+        _signedInUid = uid;
+        _checkingCallback = false;
+      });
+      return;
+    }
+    // 3) No persisted session; try Clerk token from URL if present.
+    _handleCallback();
   }
 
   Future<void> _handleCallback() async {
@@ -62,6 +121,7 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
       await _auth.signInWithCustomToken(customToken);
       final uid = _auth.clerkIdFromFirebase;
       if (mounted && uid != null && uid.isNotEmpty) {
+        web_redirect.clearClerkCallbackFromUrl();
         setState(() {
           _checkingCallback = false;
           _signedInUid = uid;
@@ -70,8 +130,15 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
         setState(() { _checkingCallback = false; _error = 'Firebase sign-in failed'; });
       }
     } catch (e, stack) {
+      final isExpired = e.toString().contains('JWT is expired') || e.toString().contains('401');
+      if (isExpired) web_redirect.clearClerkCallbackFromUrl();
       if (mounted) {
-        setState(() { _checkingCallback = false; _error = e.toString(); });
+        setState(() {
+          _checkingCallback = false;
+          _error = isExpired
+              ? 'Session expired. Please sign in again.'
+              : e.toString();
+        });
       }
       assert(() { debugPrint('Auth callback error: $e\n$stack'); return true; }());
     }
@@ -107,6 +174,7 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
       return WebAuthGate(userId: _signedInUid!);
     }
     if (_error != null) {
+      final isSessionExpired = _error!.contains('Session expired');
       return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
@@ -118,15 +186,26 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
                 Text(_error!, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => setState(() { _error = null; _checkingCallback = true; _handleCallback(); }),
+                  onPressed: () {
+                    setState(() {
+                      _error = null;
+                      if (isSessionExpired) _userChoseLanding = true;
+                      else _checkingCallback = true;
+                    });
+                    if (!isSessionExpired) _handleCallback();
+                  },
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
-                  child: const Text('Retry'),
+                  child: Text(isSessionExpired ? 'Sign in again' : 'Retry'),
                 ),
               ],
             ),
           ),
         ),
       );
+    }
+    // User chose "Sign in again" after session expired – show landing and ignore URL token.
+    if (_userChoseLanding) {
+      return LandingPage(onSignUp: () => _goToClerkSignIn(isSignUp: true), onSignIn: () => _goToClerkSignIn(isSignUp: false));
     }
     // About to show landing – re-check token from main(), redirect helper, or Uri.base; retry once.
     String? tokenNow = widget.initialClerkToken;
@@ -164,6 +243,19 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: _buildHome(),
+      onGenerateRoute: (RouteSettings settings) {
+        if (settings.name == '/app') {
+          final uid = _auth.currentFirebaseUser?.uid;
+          if (uid == null || uid.isEmpty) {
+            return MaterialPageRoute<void>(builder: (_) => _buildHome());
+          }
+          return MaterialPageRoute<void>(builder: (_) => WebAuthGate(userId: uid));
+        }
+        return null;
+      },
+      onUnknownRoute: (RouteSettings settings) {
+        return MaterialPageRoute<void>(builder: (_) => _buildHome());
+      },
     );
   }
 }

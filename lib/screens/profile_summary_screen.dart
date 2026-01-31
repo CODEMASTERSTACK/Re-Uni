@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import '../models/user_profile.dart';
@@ -5,6 +8,7 @@ import '../services/firestore_service.dart';
 import '../services/auth_service.dart';
 import 'profile_setup_screen.dart';
 import 'verification_screen.dart';
+import '../web_redirect_stub.dart' if (dart.library.html) '../web_redirect_web.dart' as web_redirect;
 
 class ProfileSummaryScreen extends StatefulWidget {
   final String userId;
@@ -28,11 +32,18 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
   }
 
   Future<void> _load() async {
+    // Ensure auth token is ready so Firestore rules see request.auth (avoids permission-denied on refresh).
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null) {
+      await firebaseUser.getIdToken(true);
+    }
     final p = await _firestore.getUserProfile(widget.userId);
-    setState(() {
-      _profile = p;
-      _loading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _profile = p;
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -77,12 +88,30 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
-              try {
-                await ClerkAuth.of(context).signOut();
-              } catch (_) {}
-              await _auth.signOut();
-              if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              if (kIsWeb) {
+                // On web: sign out of Firebase, then redirect to Clerk sign-out page so user must re-enter credentials next login.
+                await _auth.signOut();
+                try {
+                  await _auth.authStateChanges
+                      .firstWhere((User? u) => u == null)
+                      .timeout(const Duration(seconds: 5));
+                } catch (_) {}
+                if (context.mounted) {
+                  web_redirect.redirectToClerkSignOut();
+                }
+              } else {
+                try {
+                  await ClerkAuth.of(context).signOut();
+                } catch (_) {}
+                await _auth.signOut();
+                try {
+                  await _auth.authStateChanges
+                      .firstWhere((User? u) => u == null)
+                      .timeout(const Duration(seconds: 5));
+                } catch (_) {}
+                if (context.mounted) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+                }
               }
             },
           ),

@@ -1,7 +1,6 @@
-import 'dart:math';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
-import '../constants.dart';
 import '../services/firestore_service.dart';
 
 class SwipeScreen extends StatefulWidget {
@@ -19,6 +18,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
   int _index = 0;
   bool _loading = true;
   UserProfile? _currentProfile;
+  String? _error;
 
   @override
   void initState() {
@@ -27,25 +27,47 @@ class _SwipeScreenState extends State<SwipeScreen> {
   }
 
   Future<void> _loadBatch() async {
-    setState(() => _loading = true);
-    final swiped = await _firestore.getSwipedTargetIds(widget.userId);
-    final profile = await _firestore.getUserProfile(widget.userId);
-    if (profile == null) {
-      setState(() => _loading = false);
-      return;
+    if (!mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+      await firebaseUser.getIdToken(true);
+      final swiped = await _firestore.getSwipedTargetIds(widget.userId);
+      final profile = await _firestore.getUserProfile(widget.userId);
+      if (!mounted) return;
+      if (profile == null) {
+        setState(() => _loading = false);
+        return;
+      }
+      final batch = await _firestore.getDiscoveryBatch(
+        currentUserId: widget.userId,
+        currentUserGender: profile.gender,
+        currentUserInterestIds: profile.interestIds,
+        discoveryPreference: profile.discoveryPreference,
+        excludeUserIds: swiped,
+      );
+      if (!mounted) return;
+      setState(() {
+        _batch = batch;
+        _index = 0;
+        _currentProfile = batch.isEmpty ? null : batch[0];
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+          _batch = [];
+          _currentProfile = null;
+        });
+      }
     }
-    final batch = await _firestore.getDiscoveryBatch(
-      widget.userId,
-      profile.discoveryPreference,
-      swiped,
-    );
-    batch.shuffle(Random());
-    setState(() {
-      _batch = batch;
-      _index = 0;
-      _currentProfile = batch.isEmpty ? null : batch[0];
-      _loading = false;
-    });
   }
 
   Future<void> _swipe(String action) async {
@@ -56,6 +78,7 @@ class _SwipeScreenState extends State<SwipeScreen> {
     if (action == 'like') {
       await _firestore.incrementSwipeCount(widget.userId);
     }
+    if (!mounted) return;
     setState(() {
       _index++;
       if (_index < _batch.length) {
@@ -69,10 +92,40 @@ class _SwipeScreenState extends State<SwipeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _batch.isEmpty) {
+    if (_loading && _batch.isEmpty && _error == null) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Color(0xFFFF4458))),
+      );
+    }
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Swipe', style: TextStyle(color: Colors.white)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Couldn\'t load profiles.',
+                  style: TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => _loadBatch(),
+                  child: const Text('Retry', style: TextStyle(color: Color(0xFFFF4458))),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
     }
     final p = _currentProfile;
@@ -85,10 +138,13 @@ class _SwipeScreenState extends State<SwipeScreen> {
           title: const Text('Swipe', style: TextStyle(color: Colors.white)),
         ),
         body: const Center(
-          child: Text(
-            'No more profiles right now. Check back later!',
-            style: TextStyle(color: Colors.white70),
-            textAlign: TextAlign.center,
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No profiles to show for now.',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
@@ -100,7 +156,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
       );
     }
     final imageUrl = p.profileImageUrls.isNotEmpty ? p.profileImageUrls.first : null;
-    final interests = p.interestIds.take(5).join(' · ');
+    final interests = p.interestIds
+        .where((id) => id.isNotEmpty)
+        .take(5)
+        .map((id) => id.length > 1 ? '${id[0].toUpperCase()}${id.substring(1)}' : id.toUpperCase())
+        .join(' · ');
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -143,6 +203,11 @@ class _SwipeScreenState extends State<SwipeScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (p.gender.isNotEmpty)
+                        Text(
+                          p.gender[0].toUpperCase() + p.gender.substring(1).replaceAll('_', ' '),
+                          style: const TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
                       if (p.location.isNotEmpty)
                         Text(
                           p.location,

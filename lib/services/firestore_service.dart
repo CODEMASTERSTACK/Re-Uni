@@ -225,18 +225,24 @@ class FirestoreService {
     });
   }
 
-  /// Discovery: users matching discovery preference, verified, not swiped. Batch 20.
-  Future<List<UserProfile>> getDiscoveryBatch(
-    String currentUserId,
-    String discoveryPreference,
-    Set<String> excludeUserIds,
-  ) async {
-    final genders = _gendersForPreference(discoveryPreference);
+  /// Discovery: interest-matched first, then random. Gender filter: male viewer → female profiles, female → male.
+  Future<List<UserProfile>> getDiscoveryBatch({
+    required String currentUserId,
+    required String currentUserGender,
+    required List<String> currentUserInterestIds,
+    required String discoveryPreference,
+    required Set<String> excludeUserIds,
+  }) async {
+    // Gender-based filtering: male users see female profiles, female users see male profiles.
+    final List<String> gendersToShow = _gendersToShowForViewer(currentUserGender, discoveryPreference);
+    if (gendersToShow.isEmpty) return [];
+
+    final int limit = kDiscoveryBatchSize * 3 + excludeUserIds.length; // fetch extra for sorting
     Query<Map<String, dynamic>> q = _users
         .where('onboardingComplete', isEqualTo: true)
         .where('isStudentVerified', isEqualTo: true)
-        .where('gender', whereIn: genders)
-        .limit(kDiscoveryBatchSize + excludeUserIds.length);
+        .where('gender', whereIn: gendersToShow)
+        .limit(limit);
 
     final snapshot = await q.get();
     final candidates = <UserProfile>[];
@@ -245,8 +251,37 @@ class FirestoreService {
       if (excludeUserIds.contains(doc.id)) continue;
       candidates.add(UserProfile.fromMap(doc.data(), doc.id));
     }
-    candidates.shuffle();
-    return candidates.take(kDiscoveryBatchSize).toList();
+
+    // Interest matching: profiles with at least one shared interest first, then fallback random.
+    final currentInterests = currentUserInterestIds.toSet();
+    final withSharedInterest = <UserProfile>[];
+    final withoutSharedInterest = <UserProfile>[];
+    for (final p in candidates) {
+      final hasShared = p.interestIds.any((id) => currentInterests.contains(id));
+      if (hasShared) {
+        withSharedInterest.add(p);
+      } else {
+        withoutSharedInterest.add(p);
+      }
+    }
+    withSharedInterest.shuffle();
+    withoutSharedInterest.shuffle();
+    final combined = [...withSharedInterest, ...withoutSharedInterest];
+    return combined.take(kDiscoveryBatchSize).toList();
+  }
+
+  /// Male viewer → female profiles; female viewer → male profiles; else use discovery preference.
+  List<String> _gendersToShowForViewer(String viewerGender, String discoveryPreference) {
+    switch (viewerGender) {
+      case 'male':
+        return ['female'];
+      case 'female':
+        return ['male'];
+      case 'non_binary':
+      case 'other':
+      default:
+        return _gendersForPreference(discoveryPreference);
+    }
   }
 
   List<String> _gendersForPreference(String pref) {

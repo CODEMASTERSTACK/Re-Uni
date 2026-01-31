@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/firestore_service.dart';
@@ -32,6 +33,11 @@ class _WebAuthGateState extends State<WebAuthGate> {
     if (!_loading) return;
     setState(() { _error = null; });
     try {
+      // Skip Firestore if user just signed out (root will show landing).
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) return;
+      // Ensure auth token is ready so Firestore rules see request.auth (avoids permission-denied on refresh).
+      await firebaseUser.getIdToken(true);
       await _firestore.setSuspendedIfPastDeadline(widget.userId);
       final profile = await _firestore.getUserProfile(widget.userId);
       if (mounted) {
