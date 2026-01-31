@@ -80,7 +80,8 @@ class _UniDateWebAppState extends State<UniDateWebApp> {
   void _goToClerkSignIn({required bool isSignUp}) {
     final base = kClerkWebSignInUrl.split('?').first;
     final path = isSignUp ? base.replaceFirst(RegExp(r'sign-in$'), 'sign-up') : base;
-    final redirectUri = Uri.base.replace(path: '', queryParameters: {}, fragment: '');
+    // Redirect to clerk-bridge.html so Clerk.js can exchange URL session for a JWT, then bridge redirects to app with __clerk_db_jwt.
+    final redirectUri = Uri.base.replace(path: '/clerk-bridge.html', queryParameters: {}, fragment: '');
     final url = '$path?redirect_url=${Uri.encodeComponent(redirectUri.toString())}';
     web_redirect.redirectToClerkSignIn(url);
   }
