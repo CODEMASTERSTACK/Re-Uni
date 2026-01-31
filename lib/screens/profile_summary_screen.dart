@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import '../constants.dart';
 import '../models/user_profile.dart';
@@ -22,7 +23,7 @@ const Color _kPinkEngagement = Color(0xFFFFE5E9);
 const Color _kBorderGray = Color(0xFFE0E0E0);
 const Color _kInstagramStart = Color(0xFFF58529);
 const Color _kInstagramEnd = Color(0xFFDD2A7B);
-const Color _kSnapchatYellow = Color.fromARGB(255, 250, 250, 113);
+const Color _kSnapchatYellow = Color.fromARGB(255, 231, 193, 69);
 const Color _kSpotifyGreen = Color(0xFF1DB954);
 
 class ProfileSummaryScreen extends StatefulWidget {
@@ -40,10 +41,13 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
   UserProfile? _profile;
   bool _loading = true;
   int _coverIndex = 0;
+  /// Set on each _load() so image URLs get a fresh cache-bust and new photos show after edit.
+  late DateTime _imageCacheBust;
 
   @override
   void initState() {
     super.initState();
+    _imageCacheBust = DateTime.now();
     _load();
   }
 
@@ -52,11 +56,12 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
     if (firebaseUser != null) {
       await firebaseUser.getIdToken(true);
     }
-    final p = await _firestore.getUserProfile(widget.userId);
+    final p = await _firestore.getUserProfile(widget.userId, fromServer: true);
     if (mounted) {
       setState(() {
         _profile = p;
         _loading = false;
+        _imageCacheBust = DateTime.now();
       });
     }
   }
@@ -91,21 +96,37 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
     }
     final p = _profile!;
     final suspended = p.isSuspended;
+    final wallpaperUrl = p.profileWallpaperUrl;
     return Scaffold(
       backgroundColor: _kBgLight,
-      body: suspended
-          ? _buildSuspended(p)
-          : CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(child: _buildCoverAndPhotos(p)),
-                SliverToBoxAdapter(child: _buildProfileInfo(p)),
-                SliverToBoxAdapter(child: _buildEngagement(p)),
-                SliverToBoxAdapter(child: _buildSocialAndActions(p)),
-                SliverToBoxAdapter(child: _buildInterests(p)),
-                if (!p.isStudentVerified) SliverToBoxAdapter(child: _buildVerifyCta(p)),
-                const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ],
-            ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Profile wallpaper background (default white when null)
+          if (wallpaperUrl != null && wallpaperUrl.isNotEmpty)
+            Image.network(
+              wallpaperUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(color: Colors.white),
+            )
+          else
+            Container(color: Colors.white),
+          // Content on top
+          suspended
+              ? _buildSuspended(p)
+              : CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(child: _buildCoverAndPhotos(p)),
+                    SliverToBoxAdapter(child: _buildProfileInfo(p)),
+                    SliverToBoxAdapter(child: _buildEngagement(p)),
+                    SliverToBoxAdapter(child: _buildSocialAndActions(p)),
+                    SliverToBoxAdapter(child: _buildInterests(p)),
+                    if (!p.isStudentVerified) SliverToBoxAdapter(child: _buildVerifyCta(p)),
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ],
+                ),
+        ],
+      ),
     );
   }
 
@@ -134,7 +155,10 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
                       ? PageView.builder(
                           itemCount: urls.length,
                           onPageChanged: (i) => setState(() => _coverIndex = i),
-                          itemBuilder: (_, i) => Image.network(urls[i], fit: BoxFit.cover),
+                          itemBuilder: (_, i) => Image.network(
+                            _imageUrlWithCacheBust(urls[i], _imageCacheBust),
+                            fit: BoxFit.cover,
+                          ),
                         )
                       : Container(
                           color: _kBorderGray,
@@ -201,7 +225,7 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
   }
 
   Widget _thumbnailWithRemove(String url, UserProfile p) {
-    final cacheBustedUrl = _imageUrlWithCacheBust(url, p.updatedAt);
+    final cacheBustedUrl = _imageUrlWithCacheBust(url, _imageCacheBust);
     return Stack(
       children: [
         ClipRRect(
@@ -325,7 +349,7 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
                 if (p.instagramHandle != null && p.instagramHandle!.isNotEmpty)
                   _socialPill(
                     label: p.instagramHandle!,
-                    icon: Icons.camera_alt,
+                    icon: const FaIcon(FontAwesomeIcons.instagram, size: 20, color: Colors.white),
                     gradient: const LinearGradient(
                       colors: [_kInstagramStart, _kInstagramEnd],
                       begin: Alignment.topLeft,
@@ -335,13 +359,13 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
                 if (p.snapchatHandle != null && p.snapchatHandle!.isNotEmpty)
                   _socialPill(
                     label: p.snapchatHandle!,
-                    icon: Icons.photo_camera_outlined,
+                    icon: const FaIcon(FontAwesomeIcons.snapchat, size: 20, color: Colors.white),
                     color: _kSnapchatYellow,
                   ),
                 if (p.spotifyPlaylistUrl != null && p.spotifyPlaylistUrl!.isNotEmpty)
                   _socialPill(
                     label: 'Spotify',
-                    icon: Icons.music_note,
+                    icon: const FaIcon(FontAwesomeIcons.spotify, size: 20, color: Colors.white),
                     color: _kSpotifyGreen,
                   ),
               ],
@@ -385,7 +409,7 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
 
   Widget _socialPill({
     required String label,
-    required IconData icon,
+    required Widget icon,
     Color? color,
     Gradient? gradient,
   }) {
@@ -402,7 +426,7 @@ class _ProfileSummaryScreenState extends State<ProfileSummaryScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20, color: Colors.white),
+          icon,
           const SizedBox(width: 8),
           Text(label, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500)),
         ],

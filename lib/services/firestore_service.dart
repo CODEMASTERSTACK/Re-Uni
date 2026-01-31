@@ -25,8 +25,11 @@ class FirestoreService {
     await _users.doc(profile.clerkId).set(profile.toMap());
   }
 
-  Future<UserProfile?> getUserProfile(String clerkId) async {
-    final doc = await _users.doc(clerkId).get();
+  Future<UserProfile?> getUserProfile(String clerkId, {bool fromServer = false}) async {
+    final options = fromServer ? const GetOptions(source: Source.server) : null;
+    final doc = options != null
+        ? await _users.doc(clerkId).get(options)
+        : await _users.doc(clerkId).get();
     if (doc.data() == null) return null;
     return UserProfile.fromMap(doc.data()!, doc.id);
   }

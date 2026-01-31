@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -21,6 +23,14 @@ const Color _kAccent = Color(0xFFFF9800); // orange
 const Color _kAccentLight = Color(0xFFFFB74D);
 const int _kBioMaxLength = 500;
 const int _kInterestsShowMoreThreshold = 12;
+
+/// Strips HTML-like content to prevent XSS; safe to store and display in Flutter or HTML.
+String _sanitizeForXSS(String s) {
+  if (s.isEmpty) return s;
+  String t = s.replaceAll(RegExp(r'<[^>]*>'), ''); // remove tag-like content
+  t = t.replaceAll('<', '').replaceAll('>', '');   // remove any remaining angle brackets
+  return t.trim();
+}
 
 class ProfileSetupScreen extends StatefulWidget {
   final String clerkId;
@@ -66,6 +76,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _interestsExpanded = false;
+  /// Profile summary background. Null = default white.
+  String? _selectedWallpaperUrl;
 
   bool get _isEdit => widget.initialProfile != null;
 
@@ -85,7 +97,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     _spotifyController = TextEditingController(text: p?.spotifyPlaylistUrl ?? '');
     _interestSearchController = TextEditingController();
     if (p != null) {
-      _age = p.age;
+      _age = p.age.clamp(1, 99);
       _gender = p.gender;
       _discoveryPreference = p.discoveryPreference;
       _nameChangeCount = p.nameChangeCount;
@@ -93,6 +105,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       _ageChangeCount = p.ageChangeCount;
       _profileImageUrls.addAll(p.profileImageUrls);
       _selectedInterestIds.addAll(p.interestIds);
+      _selectedWallpaperUrl = p.profileWallpaperUrl;
     }
     _ageController = TextEditingController(text: _age.toString());
     _loadInterests();
@@ -119,11 +132,37 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
   }
 
+  /// Returns true if the picked file looks like an image (MIME type).
+  bool _isImageMimeType(XFile? xfile) {
+    if (xfile == null) return false;
+    final mime = xfile.mimeType?.toLowerCase();
+    if (mime == null || mime.isEmpty) return true; // allow if unknown (e.g. desktop)
+    return mime.startsWith('image/');
+  }
+
+  /// Verifies [bytes] decode as an image to reject non-image files.
+  Future<bool> _isValidImageBytes(Uint8List bytes) async {
+    try {
+      await ui.instantiateImageCodec(bytes);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Picks, crops, compresses, then uploads as main profile picture (index 0).
   Future<void> _pickAndCropImageAsMainPhoto() async {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
+    if (!_isImageMimeType(xfile)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select an image file (e.g. JPG, PNG)')),
+        );
+      }
+      return;
+    }
     String? pathToUse = xfile.path;
     if (!kIsWeb) {
       final cropped = await ImageCropper().cropImage(
@@ -152,6 +191,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
     }
     if (bytes == null || bytes.isEmpty) return;
+    final validImage = await _isValidImageBytes(bytes);
+    if (!validImage) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selected file is not a valid image. Please choose a JPG, PNG or similar.')),
+        );
+      }
+      return;
+    }
     setState(() => _saving = true);
     try {
       final url = await _storage.uploadProfileImage(
@@ -183,6 +231,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
+    if (!_isImageMimeType(xfile)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select an image file (e.g. JPG, PNG)')),
+        );
+      }
+      return;
+    }
     String? pathToUse = xfile.path;
     if (!kIsWeb) {
       final cropped = await ImageCropper().cropImage(
@@ -211,6 +267,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
     }
     if (bytes == null || bytes.isEmpty) return;
+    final validImage = await _isValidImageBytes(bytes);
+    if (!validImage) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Selected file is not a valid image. Please choose a JPG, PNG or similar.')),
+        );
+      }
+      return;
+    }
     setState(() => _saving = true);
     try {
       final index = _profileImageUrls.length;
@@ -243,14 +308,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
     setState(() => _saving = true);
-    final name = _nameController.text.trim();
-    final location = _locationController.text.trim();
-    final bio = _bioController.text.trim();
-    final instagram = _instagramController.text.trim();
-    final snapchat = _snapchatController.text.trim();
-    final spotify = _spotifyController.text.trim();
+    final name = _sanitizeForXSS(_nameController.text.trim());
+    final location = _sanitizeForXSS(_locationController.text.trim());
+    final bio = _sanitizeForXSS(_bioController.text.trim());
+    final instagram = _sanitizeForXSS(_instagramController.text.trim());
+    final snapchat = _sanitizeForXSS(_snapchatController.text.trim());
+    final spotify = _sanitizeForXSS(_spotifyController.text.trim());
     final ageRaw = int.tryParse(_ageController.text.trim());
-    final age = ageRaw != null ? ageRaw.clamp(18, 100) : _age;
+    final age = ageRaw != null ? ageRaw.clamp(1, 99) : _age;
     try {
       final now = DateTime.now();
       if (_isEdit) {
@@ -264,6 +329,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           'instagramHandle': instagram.isEmpty ? null : instagram,
           'snapchatHandle': snapchat.isEmpty ? null : snapchat,
           'spotifyPlaylistUrl': spotify.isEmpty ? null : spotify,
+          'profileWallpaperUrl': _selectedWallpaperUrl,
         };
         final newName = name.isEmpty ? p.fullName : name;
         if (_nameChangeCount >= kMaxNameGenderAgeChanges) {
@@ -308,6 +374,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           instagramHandle: instagram.isEmpty ? null : instagram,
           snapchatHandle: snapchat.isEmpty ? null : snapchat,
           spotifyPlaylistUrl: spotify.isEmpty ? null : spotify,
+          profileWallpaperUrl: _selectedWallpaperUrl,
           isStudentVerified: false,
           verificationDeadlineAt: deadline,
           suspendedAt: null,
@@ -363,6 +430,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
               _buildAboutYouSection(),
               const SizedBox(height: 24),
               _buildSocialSection(),
+              const SizedBox(height: 24),
+              _buildWallpaperSection(),
               const SizedBox(height: 24),
               _buildInterestsCard(),
               const SizedBox(height: 24),
@@ -556,18 +625,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                         )
                       : TextFormField(
                           controller: _ageController,
-                          decoration: _inputDecoration(hint: '18–100'),
+                          decoration: _inputDecoration(hint: '1–99'),
                           style: TextStyle(color: _kTextPrimary),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) return 'Enter age';
                             final n = int.tryParse(v.trim());
-                            if (n == null || n < 18 || n > 100) return 'Age must be 18–100';
+                            if (n == null || n < 1 || n > 99) return 'Age must be 1–99';
                             return null;
                           },
                           onChanged: (v) {
                             final n = int.tryParse(v.trim());
-                            if (n != null && n >= 18 && n <= 100) setState(() => _age = n);
+                            if (n != null && n >= 1 && n <= 99) setState(() => _age = n);
                           },
                         ),
                 ),
@@ -745,6 +815,73 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
   }
 
+  Widget _buildWallpaperSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Profile background',
+            style: TextStyle(color: _kTextPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Choose a background for your profile summary. Others will see it when they view your profile.',
+            style: TextStyle(color: _kTextMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 112,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                // Default (white)
+                _WallpaperTile(
+                  label: 'Default',
+                  isSelected: _selectedWallpaperUrl == null,
+                  onTap: () => setState(() => _selectedWallpaperUrl = null),
+                  child: Container(
+                    width: 88,
+                    height: 88,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _kBorder),
+                    ),
+                    child: Icon(Icons.wb_sunny_outlined, color: _kTextMuted, size: 28),
+                  ),
+                ),
+                ...kProfileWallpaperOptions.whereType<String>().map((url) {
+                  final selected = _selectedWallpaperUrl == url;
+                  return _WallpaperTile(
+                    label: null,
+                    isSelected: selected,
+                    onTap: () => setState(() => _selectedWallpaperUrl = url),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        url,
+                        width: 88,
+                        height: 88,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInterestsCard() {
     final filtered = _filteredInterests;
     final showCount = _interestsExpanded ? filtered.length : filtered.length.clamp(0, _kInterestsShowMoreThreshold);
@@ -856,6 +993,72 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               )
             : const Text('SAVE PROFILE'),
+      ),
+    );
+  }
+}
+
+class _WallpaperTile extends StatelessWidget {
+  final String? label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Widget child;
+
+  const _WallpaperTile({
+    this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                child,
+                if (isSelected)
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: _kAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check, color: Colors.white, size: 16),
+                    ),
+                  ),
+                if (isSelected)
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: _kAccent, width: 3),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            if (label != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                label!,
+                style: TextStyle(color: _kTextSecondary, fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

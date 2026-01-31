@@ -4,6 +4,7 @@ import '../models/user_profile.dart';
 import '../models/match_record.dart';
 import '../services/firestore_service.dart';
 import 'chat_thread_screen.dart';
+import 'view_match_profile_screen.dart';
 
 class MatchesScreen extends StatefulWidget {
   final String userId;
@@ -82,6 +83,17 @@ class _MatchesScreenState extends State<MatchesScreen> {
     _load();
   }
 
+  void _viewProfile(String otherUserId, UserProfile? profile) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ViewMatchProfileScreen(
+          otherUserId: otherUserId,
+          profile: profile,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _error == null) {
@@ -140,6 +152,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
               return _MatchTile(
                 profile: p,
                 status: 'pending',
+                onViewProfile: () => _viewProfile(otherId, p),
                 onAccept: () => _accept(m),
                 onReject: () => _reject(m),
               );
@@ -158,6 +171,7 @@ class _MatchesScreenState extends State<MatchesScreen> {
               return _MatchTile(
                 profile: p,
                 status: 'matched',
+                onViewProfile: () => _viewProfile(otherId, p),
                 onAccept: () => _accept(m),
                 onReject: () => _reject(m),
               );
@@ -182,12 +196,14 @@ class _MatchesScreenState extends State<MatchesScreen> {
 class _MatchTile extends StatelessWidget {
   final UserProfile? profile;
   final String status;
+  final VoidCallback onViewProfile;
   final VoidCallback onAccept;
   final VoidCallback onReject;
 
   const _MatchTile({
     required this.profile,
     required this.status,
+    required this.onViewProfile,
     required this.onAccept,
     required this.onReject,
   });
@@ -221,6 +237,11 @@ class _MatchTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
+                    icon: const Icon(Icons.person_outline, color: Colors.white70),
+                    tooltip: 'View Profile',
+                    onPressed: onViewProfile,
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.close, color: Colors.red),
                     onPressed: onReject,
                   ),
@@ -230,9 +251,19 @@ class _MatchTile extends StatelessWidget {
                   ),
                 ],
               )
-            : IconButton(
-                icon: const Icon(Icons.chat, color: Color(0xFFFF4458)),
-                onPressed: onAccept,
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.person_outline, color: Colors.white70),
+                    tooltip: 'View Profile',
+                    onPressed: onViewProfile,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chat, color: Color(0xFFFF4458)),
+                    onPressed: onAccept,
+                  ),
+                ],
               ),
       ),
     );

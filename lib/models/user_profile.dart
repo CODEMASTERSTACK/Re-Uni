@@ -16,6 +16,8 @@ class UserProfile {
   final String? instagramHandle;
   final String? snapchatHandle;
   final String? spotifyPlaylistUrl;
+  /// URL of the profile summary background image. Null = default white.
+  final String? profileWallpaperUrl;
   final bool isStudentVerified;
   final String? universityEmail;
   final DateTime? verificationDeadlineAt;
@@ -46,6 +48,7 @@ class UserProfile {
     this.instagramHandle,
     this.snapchatHandle,
     this.spotifyPlaylistUrl,
+    this.profileWallpaperUrl,
     this.isStudentVerified = false,
     this.universityEmail,
     this.verificationDeadlineAt,
@@ -75,6 +78,7 @@ class UserProfile {
       if (instagramHandle != null) 'instagramHandle': instagramHandle,
       if (snapchatHandle != null) 'snapchatHandle': snapchatHandle,
       if (spotifyPlaylistUrl != null) 'spotifyPlaylistUrl': spotifyPlaylistUrl,
+      if (profileWallpaperUrl != null) 'profileWallpaperUrl': profileWallpaperUrl,
       'isStudentVerified': isStudentVerified,
       if (universityEmail != null) 'universityEmail': universityEmail,
       if (verificationDeadlineAt != null)
@@ -108,6 +112,7 @@ class UserProfile {
       instagramHandle: map['instagramHandle'] as String?,
       snapchatHandle: map['snapchatHandle'] as String?,
       spotifyPlaylistUrl: map['spotifyPlaylistUrl'] as String?,
+      profileWallpaperUrl: map['profileWallpaperUrl'] as String?,
       isStudentVerified: map['isStudentVerified'] as bool? ?? false,
       universityEmail: map['universityEmail'] as String?,
       verificationDeadlineAt: (map['verificationDeadlineAt'] as Timestamp?)
@@ -137,6 +142,7 @@ class UserProfile {
     String? instagramHandle,
     String? snapchatHandle,
     String? spotifyPlaylistUrl,
+    String? profileWallpaperUrl,
     bool? isStudentVerified,
     String? universityEmail,
     DateTime? verificationDeadlineAt,
@@ -163,6 +169,7 @@ class UserProfile {
       instagramHandle: instagramHandle ?? this.instagramHandle,
       snapchatHandle: snapchatHandle ?? this.snapchatHandle,
       spotifyPlaylistUrl: spotifyPlaylistUrl ?? this.spotifyPlaylistUrl,
+      profileWallpaperUrl: profileWallpaperUrl ?? this.profileWallpaperUrl,
       isStudentVerified: isStudentVerified ?? this.isStudentVerified,
       universityEmail: universityEmail ?? this.universityEmail,
       verificationDeadlineAt:
