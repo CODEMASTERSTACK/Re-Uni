@@ -45,7 +45,8 @@ module.exports = async (req, res) => {
       'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5173',
       'http://localhost:51806', 'http://localhost:55926', 'http://localhost:57188',
       'http://localhost:52297', 'http://localhost:58633', 'https://localhost',
-      'https://working-turtle-74.accounts.dev', 'https://working-turtle-74.clerk.accounts.dev',
+      'http://localhost:55142',
+      'https://working-turtle-74.accounts.dev', 'https:sff//working-turtle-74.clerk.accounts.dev',
       'https://re-uni.vercel.app',
     ];
     const authorizedParties = process.env.CLERK_AUTHORIZED_PARTIES
