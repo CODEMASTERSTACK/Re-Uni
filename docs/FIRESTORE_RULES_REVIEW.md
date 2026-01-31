@@ -13,7 +13,7 @@ This document reviews Firestore rules against the UniDate webapp’s actual usag
 | `config/{doc}` | read: auth; write: false | Future config docs | ✅ Correct |
 | `swipes/{swipeId}` | read: auth; create: auth + actorId | recordSwipe, getSwipedTargetIds | ✅ Tightened (see below) |
 | `matches/{matchId}` | create/read/update/delete: participant | upsert, reject, getMatches, createChat | ✅ Correct |
-| `chats/{chatId}` + `messages` | participant-only | createChat, getChats, sendMessage, watchMessages | ✅ Correct |
+| `chats/{chatId}` + `messages` | participant-only; message create requires isStudentVerified | createChat, getChats, sendMessage, watchMessages | ✅ Correct |
 | `verification_otps/{doc}` | read, write: false | Server-only (Vercel API) | ✅ Correct |
 
 ---
@@ -23,7 +23,7 @@ This document reviews Firestore rules against the UniDate webapp’s actual usag
 - **Rules:** `allow read: if request.auth != null;` and `allow write: if request.auth != null && request.auth.uid == userId;`
 - **Usage:**
   - **Read:** Own profile (profile summary, auth gate, profile setup), other users’ profiles (discovery batch, matches list, chat list, chat thread). Doc ID = Clerk ID = Firebase Auth UID after custom token.
-  - **Write:** setUserProfile (create/overwrite), updateUserProfile, setSuspendedIfPastDeadline, incrementSwipeCount. All use the current user’s doc.
+  - **Write:** setUserProfile (create/overwrite), updateUserProfile, setSuspendedIfPastDeadline, incrementSwipeCount, incrementProfilesViewedWhileUnverified. All use the current user’s doc.
 - **Verdict:** Correct. Any authenticated user may read any profile (needed for discovery and match/chat UIs). Only the profile owner can write.
 
 ---
@@ -67,9 +67,9 @@ This document reviews Firestore rules against the UniDate webapp’s actual usag
 
 ## 6. `chats/{chatId}` and `chats/{chatId}/messages/{msgId}`
 
-- **Rules:** create/read/update/delete chat if participant; read/write messages if participant (via get() on parent chat).
+- **Rules:** create/read/update/delete chat if participant. Messages: read if participant; create only if participant **and** `users/$(request.auth.uid)` exists and `isStudentVerified == true`; update/delete false.
 - **Usage:** createChatIfMatched (set chat), getChatsForUser (query by user1Id/user2Id), sendMessage (add message + update chat lastMessageAt/lastMessagePreview), watchMessages (stream). chatId = matchId.
-- **Verdict:** Correct. Only participants can access a chat and its messages.
+- **Verdict:** Correct. Only participants can access a chat; only verified students can create messages. The `exists()` check avoids rule failure when the user doc is missing.
 
 ---
 

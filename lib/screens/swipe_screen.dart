@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../constants.dart';
 import '../models/user_profile.dart';
 import '../services/firestore_service.dart';
 
@@ -18,6 +20,8 @@ class _SwipeScreenState extends State<SwipeScreen> {
   int _index = 0;
   bool _loading = true;
   UserProfile? _currentProfile;
+  UserProfile? _myProfile;
+  int _profilesViewedWhileUnverified = 0;
   String? _error;
 
   @override
@@ -43,15 +47,39 @@ class _SwipeScreenState extends State<SwipeScreen> {
         setState(() => _loading = false);
         return;
       }
+      final bool unverified = !profile.isStudentVerified;
+      final int viewed = profile.profilesViewedWhileUnverified;
+      int? maxForUnverified;
+      if (unverified) {
+        final remaining = kMaxProfilesForUnverified - viewed;
+        if (remaining <= 0) {
+          if (mounted) _showVerifyToViewMoreDialog();
+          setState(() {
+            _myProfile = profile;
+            _profilesViewedWhileUnverified = viewed;
+            _batch = [];
+            _index = 0;
+            _currentProfile = null;
+            _loading = false;
+            _error = null;
+          });
+          return;
+        }
+        maxForUnverified = remaining;
+      }
       final batch = await _firestore.getDiscoveryBatch(
         currentUserId: widget.userId,
         currentUserGender: profile.gender,
         currentUserInterestIds: profile.interestIds,
         discoveryPreference: profile.discoveryPreference,
         excludeUserIds: swiped,
+        includeUnverified: kDebugMode && kDiscoveryIncludeUnverifiedInDebug,
+        maxResultsForUnverified: maxForUnverified,
       );
       if (!mounted) return;
       setState(() {
+        _myProfile = profile;
+        _profilesViewedWhileUnverified = viewed;
         _batch = batch;
         _index = 0;
         _currentProfile = batch.isEmpty ? null : batch[0];
@@ -76,9 +104,30 @@ class _SwipeScreenState extends State<SwipeScreen> {
     }
   }
 
+  void _showVerifyToViewMoreDialog() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF17191C),
+        title: const Text('Verify to view more', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Verify your $kUniversityEmailDomain mail to view more profiles.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK', style: TextStyle(color: Color(0xFFFF4458))),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _swipe(String action) async {
     if (_currentProfile == null) return;
     final targetId = _currentProfile!.clerkId;
+    final unverified = _myProfile != null && !_myProfile!.isStudentVerified;
     try {
       // Ensure auth token is ready so Firestore rules see request.auth (avoids permission-denied on web).
       final firebaseUser = FirebaseAuth.instance.currentUser;
@@ -87,6 +136,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
       if (action == 'like') {
         await _firestore.upsertMatchOnLike(widget.userId, targetId);
         await _firestore.incrementSwipeCount(widget.userId);
+      }
+      if (unverified) {
+        await _firestore.incrementProfilesViewedWhileUnverified(widget.userId);
       }
     } catch (e) {
       if (mounted) {
@@ -97,7 +149,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
       return;
     }
     if (!mounted) return;
+    final newViewed = unverified ? _profilesViewedWhileUnverified + 1 : _profilesViewedWhileUnverified;
     setState(() {
+      _profilesViewedWhileUnverified = newViewed;
       _index++;
       if (_index < _batch.length) {
         _currentProfile = _batch[_index];
@@ -106,6 +160,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
         _loadBatch();
       }
     });
+    if (unverified && newViewed >= kMaxProfilesForUnverified && mounted) {
+      _showVerifyToViewMoreDialog();
+    }
   }
 
   @override
@@ -147,6 +204,9 @@ class _SwipeScreenState extends State<SwipeScreen> {
       );
     }
     final p = _currentProfile;
+    final unverifiedCapReached = _myProfile != null &&
+        !_myProfile!.isStudentVerified &&
+        _profilesViewedWhileUnverified >= kMaxProfilesForUnverified;
     if (p == null && _batch.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -155,14 +215,31 @@ class _SwipeScreenState extends State<SwipeScreen> {
           elevation: 0,
           title: const Text('Swipe', style: TextStyle(color: Colors.white)),
         ),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              'No profiles to show for now.',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
+            padding: const EdgeInsets.all(24),
+            child: unverifiedCapReached
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Verify your $kUniversityEmailDomain mail to view more profiles.',
+                        style: const TextStyle(color: Colors.white70, fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => _showVerifyToViewMoreDialog(),
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
+                        child: const Text('Verify now'),
+                      ),
+                    ],
+                  )
+                : const Text(
+                    'No profiles to show for now.',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                    textAlign: TextAlign.center,
+                  ),
           ),
         ),
       );

@@ -23,12 +23,18 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   final _firestore = FirestoreService();
   final _textController = TextEditingController();
   UserProfile? _otherProfile;
+  UserProfile? _myProfile;
+
+  bool get _canChat => _myProfile == null || _myProfile!.isStudentVerified;
 
   @override
   void initState() {
     super.initState();
     _firestore.getUserProfile(widget.otherUserId).then((p) {
       if (mounted) setState(() => _otherProfile = p);
+    });
+    _firestore.getUserProfile(widget.userId).then((p) {
+      if (mounted) setState(() => _myProfile = p);
     });
   }
 
@@ -39,6 +45,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 
   Future<void> _send() async {
+    if (!_canChat) return;
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     _textController.clear();
@@ -75,6 +82,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       ),
       body: Column(
         children: [
+          if (_myProfile != null && !_myProfile!.isStudentVerified)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFFFF4458).withValues(alpha: 0.2),
+              child: const Text(
+                'Verify your student mail account to start chatting',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+            ),
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
               stream: _firestore.watchMessages(widget.chatId),
@@ -120,33 +138,43 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
           ),
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: InputDecoration(
-                      hintText: 'Message',
-                      hintStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: const Color(0xFF17191C),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
+            child: _canChat
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          decoration: InputDecoration(
+                            hintText: 'Message',
+                            hintStyle: const TextStyle(color: Colors.white54),
+                            filled: true,
+                            fillColor: const Color(0xFF17191C),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          style: const TextStyle(color: Colors.white),
+                          onSubmitted: (_) => _send(),
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: _send,
+                        icon: const Icon(Icons.send, color: Colors.white),
+                        style: IconButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
+                      ),
+                    ],
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Verify your student mail account to start chatting',
+                      style: TextStyle(color: Colors.white54, fontSize: 14),
+                      textAlign: TextAlign.center,
                     ),
-                    style: const TextStyle(color: Colors.white),
-                    onSubmitted: (_) => _send(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _send,
-                  icon: const Icon(Icons.send, color: Colors.white),
-                  style: IconButton.styleFrom(backgroundColor: const Color(0xFFFF4458)),
-                ),
-              ],
-            ),
           ),
         ],
       ),

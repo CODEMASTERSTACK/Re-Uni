@@ -21,14 +21,23 @@ const List<String> kDiscoveryPreferences = ['men', 'women', 'everyone', 'non_bin
 /// University email domain for student verification.
 const String kUniversityEmailDomain = '@lpu.in';
 
+/// Max profiles an unverified student can see in swipe before being prompted to verify.
+const int kMaxProfilesForUnverified = 10;
+
 /// Grace period (hours) before suspension if not verified.
 const int kVerificationGraceHours = 72;
 
 /// Discovery batch size.
 const int kDiscoveryBatchSize = 20;
 
+/// When true, discovery (in debug builds only) includes profiles that are not yet student-verified, so you can test with multiple accounts without running OTP for each. Production builds always require verification.
+const bool kDiscoveryIncludeUnverifiedInDebug = true;
+
 /// Max profile images.
 const int kMaxProfileImages = 5;
+
+/// Max times user can change name, gender, or age (each) after profile creation.
+const int kMaxNameGenderAgeChanges = 2;
 
 /// Backend API base URL (Vercel). No trailing slash.
 /// Override with --dart-define=BACKEND_URL=... for local dev (e.g. http://localhost:3000).

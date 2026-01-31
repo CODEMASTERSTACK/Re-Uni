@@ -10,6 +10,7 @@ class UserProfile {
   final String gender; // male | female | non_binary | other
   final String discoveryPreference; // men | women | everyone | non_binary
   final String location;
+  final String? bio;
   final List<String> profileImageUrls;
   final List<String> interestIds;
   final String? instagramHandle;
@@ -20,6 +21,13 @@ class UserProfile {
   final DateTime? verificationDeadlineAt;
   final DateTime? suspendedAt;
   final int swipeCount;
+  final int profilesViewedWhileUnverified;
+  /// Number of times name has been changed (max 2). Used only when editing.
+  final int nameChangeCount;
+  /// Number of times gender has been changed (max 2).
+  final int genderChangeCount;
+  /// Number of times age has been changed (max 2).
+  final int ageChangeCount;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool onboardingComplete;
@@ -32,6 +40,7 @@ class UserProfile {
     required this.gender,
     required this.discoveryPreference,
     required this.location,
+    this.bio,
     required this.profileImageUrls,
     required this.interestIds,
     this.instagramHandle,
@@ -42,6 +51,10 @@ class UserProfile {
     this.verificationDeadlineAt,
     this.suspendedAt,
     this.swipeCount = 0,
+    this.profilesViewedWhileUnverified = 0,
+    this.nameChangeCount = 0,
+    this.genderChangeCount = 0,
+    this.ageChangeCount = 0,
     required this.createdAt,
     required this.updatedAt,
     this.onboardingComplete = false,
@@ -56,6 +69,7 @@ class UserProfile {
       'gender': gender,
       'discoveryPreference': discoveryPreference,
       'location': location,
+      if (bio != null) 'bio': bio,
       'profileImageUrls': profileImageUrls,
       'interestIds': interestIds,
       if (instagramHandle != null) 'instagramHandle': instagramHandle,
@@ -67,6 +81,10 @@ class UserProfile {
         'verificationDeadlineAt': Timestamp.fromDate(verificationDeadlineAt!),
       if (suspendedAt != null) 'suspendedAt': Timestamp.fromDate(suspendedAt!),
       'swipeCount': swipeCount,
+      'profilesViewedWhileUnverified': profilesViewedWhileUnverified,
+      'nameChangeCount': nameChangeCount,
+      'genderChangeCount': genderChangeCount,
+      'ageChangeCount': ageChangeCount,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'onboardingComplete': onboardingComplete,
@@ -82,6 +100,7 @@ class UserProfile {
       gender: map['gender'] as String? ?? 'other',
       discoveryPreference: map['discoveryPreference'] as String? ?? 'everyone',
       location: map['location'] as String? ?? '',
+      bio: map['bio'] as String?,
       profileImageUrls:
           List<String>.from(map['profileImageUrls'] as List<dynamic>? ?? []),
       interestIds:
@@ -95,6 +114,10 @@ class UserProfile {
           ?.toDate(),
       suspendedAt: (map['suspendedAt'] as Timestamp?)?.toDate(),
       swipeCount: (map['swipeCount'] as num?)?.toInt() ?? 0,
+      profilesViewedWhileUnverified: (map['profilesViewedWhileUnverified'] as num?)?.toInt() ?? 0,
+      nameChangeCount: (map['nameChangeCount'] as num?)?.toInt() ?? 0,
+      genderChangeCount: (map['genderChangeCount'] as num?)?.toInt() ?? 0,
+      ageChangeCount: (map['ageChangeCount'] as num?)?.toInt() ?? 0,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       onboardingComplete: map['onboardingComplete'] as bool? ?? false,
@@ -108,6 +131,7 @@ class UserProfile {
     String? gender,
     String? discoveryPreference,
     String? location,
+    String? bio,
     List<String>? profileImageUrls,
     List<String>? interestIds,
     String? instagramHandle,
@@ -118,6 +142,10 @@ class UserProfile {
     DateTime? verificationDeadlineAt,
     DateTime? suspendedAt,
     int? swipeCount,
+    int? profilesViewedWhileUnverified,
+    int? nameChangeCount,
+    int? genderChangeCount,
+    int? ageChangeCount,
     DateTime? updatedAt,
     bool? onboardingComplete,
   }) {
@@ -129,6 +157,7 @@ class UserProfile {
       gender: gender ?? this.gender,
       discoveryPreference: discoveryPreference ?? this.discoveryPreference,
       location: location ?? this.location,
+      bio: bio ?? this.bio,
       profileImageUrls: profileImageUrls ?? this.profileImageUrls,
       interestIds: interestIds ?? this.interestIds,
       instagramHandle: instagramHandle ?? this.instagramHandle,
@@ -140,6 +169,10 @@ class UserProfile {
           verificationDeadlineAt ?? this.verificationDeadlineAt,
       suspendedAt: suspendedAt ?? this.suspendedAt,
       swipeCount: swipeCount ?? this.swipeCount,
+      profilesViewedWhileUnverified: profilesViewedWhileUnverified ?? this.profilesViewedWhileUnverified,
+      nameChangeCount: nameChangeCount ?? this.nameChangeCount,
+      genderChangeCount: genderChangeCount ?? this.genderChangeCount,
+      ageChangeCount: ageChangeCount ?? this.ageChangeCount,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,

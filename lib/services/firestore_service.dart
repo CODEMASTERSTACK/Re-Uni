@@ -227,12 +227,16 @@ class FirestoreService {
   }
 
   /// Discovery: interest-matched first, then random. Gender filter: male viewer → female profiles, female → male.
+  /// When [includeUnverified] is true (e.g. debug testing), profiles without student verification are included.
+  /// When [maxResultsForUnverified] is set, returned list is capped at that many (for unverified users).
   Future<List<UserProfile>> getDiscoveryBatch({
     required String currentUserId,
     required String currentUserGender,
     required List<String> currentUserInterestIds,
     required String discoveryPreference,
     required Set<String> excludeUserIds,
+    bool includeUnverified = false,
+    int? maxResultsForUnverified,
   }) async {
     // Gender-based filtering: male users see female profiles, female users see male profiles.
     final List<String> gendersToShow = _gendersToShowForViewer(currentUserGender, discoveryPreference);
@@ -241,9 +245,11 @@ class FirestoreService {
     final int limit = kDiscoveryBatchSize * 3 + excludeUserIds.length; // fetch extra for sorting
     Query<Map<String, dynamic>> q = _users
         .where('onboardingComplete', isEqualTo: true)
-        .where('isStudentVerified', isEqualTo: true)
         .where('gender', whereIn: gendersToShow)
         .limit(limit);
+    if (!includeUnverified) {
+      q = q.where('isStudentVerified', isEqualTo: true);
+    }
 
     final snapshot = await q.get();
     final candidates = <UserProfile>[];
@@ -268,7 +274,16 @@ class FirestoreService {
     withSharedInterest.shuffle();
     withoutSharedInterest.shuffle();
     final combined = [...withSharedInterest, ...withoutSharedInterest];
-    return combined.take(kDiscoveryBatchSize).toList();
+    final cap = maxResultsForUnverified ?? kDiscoveryBatchSize;
+    return combined.take(cap).toList();
+  }
+
+  /// Increment how many profiles an unverified user has viewed in swipe (used for 10-profile cap).
+  Future<void> incrementProfilesViewedWhileUnverified(String userId) async {
+    await _users.doc(userId).update({
+      'profilesViewedWhileUnverified': FieldValue.increment(1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   /// Male viewer → female profiles; female viewer → male profiles; else use discovery preference.

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:clerk_auth/clerk_auth.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'firebase_options.dart';
@@ -16,6 +17,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerPathProviderStubWeb();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // On web, force long-polling to avoid Firestore Listen channel 400 Bad Request (WebChannel issue).
+  if (kIsWeb) {
+    FirebaseFirestore.instance.settings = const Settings(
+      webExperimentalForceLongPolling: true,
+    );
+  }
   // On web, never build ClerkAuth (avoids path_provider/Platform crash). Use redirect-based auth.
   if (kIsWeb) {
     // Read Clerk callback token and user info at the very start (from window.location) so we don't lose them.
