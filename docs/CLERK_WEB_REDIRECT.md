@@ -11,11 +11,12 @@
 ## If you still land on the landing page
 
 - **Token not read:** The token is read in `main()` as soon as the script runs. If you still see the landing page (and no red error screen), the URL might not contain `_clerk_db_jwt` when the app loads, or the redirect might be happening in a different window/iframe. Check the address bar after Clerk redirects: it should look like `http://localhost:PORT/?_clerk_db_jwt=...`.
-- **Backend returns 401:** If the backend rejects the token, you’ll see a **red error screen** with something like “Invalid Clerk token”. Then:
-  - Set **`CLERK_AUTHORIZED_PARTIES`** in your backend (Vercel env or `.env`) to include your Flutter web origin, e.g.  
-    `http://localhost:51806,http://localhost:3000`  
-    (use the exact origin and port your app runs on).
-  - Redeploy the backend and try again.
+- **Backend returns 401 "Invalid Clerk token":** The Clerk JWT’s **authorized party** (`azp`) must be in the backend’s allowlist.
+  - The **local API server** (npm run dev) already allows common localhost ports and `https://working-turtle-74.accounts.dev`. **Restart the API** after pulling changes (`npm run dev` again).
+  - If you use a different Clerk slug or Flutter port, set **`CLERK_AUTHORIZED_PARTIES`** in `.env`, e.g.  
+    `CLERK_AUTHORIZED_PARTIES=http://localhost:55926,https://working-turtle-74.accounts.dev`  
+    (include your Flutter web origin and your Clerk Account Portal URL).
+  - On Vercel: set the same in Environment Variables and redeploy.
 
 ## Backend env (Vercel / local)
 

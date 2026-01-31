@@ -52,3 +52,6 @@ lib/keys.md
 /android/app/debug
 /android/app/profile
 /android/app/release
+node_modules
+
+.vercel

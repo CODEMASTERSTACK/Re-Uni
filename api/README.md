@@ -33,5 +33,9 @@ Replaces Firebase Cloud Functions. Deploy to Vercel (free tier) and set environm
 4. Deploy: `vercel` (or connect the repo to Vercel for auto-deploy).
 
 5. In the Flutter app, set the backend URL when building:
-   - Local: default `http://localhost:3000` (run `vercel dev` in the project root).
+   - **Local (recommended):** Run the **local API server** (avoids `vercel dev` watcher issues):
+     - From project root: `npm install` then `npm run dev` (starts Express on http://localhost:3000).
+     - Create a `.env` file in the project root with `CLERK_SECRET_KEY`, `FIREBASE_SERVICE_ACCOUNT_JSON`, and optionally `CLERK_AUTHORIZED_PARTIES=http://localhost:3000,http://localhost:55926` (add your Flutter web port).
+     - Run Flutter: `flutter run -d chrome --dart-define=BACKEND_URL=http://localhost:3000`
+   - Alternatively: `vercel dev` in the project root (then same Flutter command).
    - Production: `flutter build web --dart-define=BACKEND_URL=https://your-project.vercel.app`

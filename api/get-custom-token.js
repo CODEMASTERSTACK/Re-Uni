@@ -4,11 +4,19 @@ const admin = require('firebase-admin');
 function ensureFirebase() {
   if (admin.apps.length > 0) return;
   const json = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (json) {
-    admin.initializeApp({ credential: admin.credential.cert(JSON.parse(json)) });
-  } else {
-    admin.initializeApp();
+  if (!json || String(json).trim() === '') {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is not set');
   }
+  let parsed;
+  try {
+    parsed = JSON.parse(json);
+  } catch (e) {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON is invalid JSON: ' + (e && e.message));
+  }
+  if (!parsed || parsed.type !== 'service_account') {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON must be a service_account JSON object');
+  }
+  admin.initializeApp({ credential: admin.credential.cert(parsed) });
 }
 
 module.exports = async (req, res) => {
@@ -32,10 +40,17 @@ module.exports = async (req, res) => {
     }
 
     ensureFirebase();
-    // Include your Flutter web app origin(s). Example: CLERK_AUTHORIZED_PARTIES=http://localhost:51806,http://localhost:3000
+    // Clerk JWT azp (authorized party) must include your app origin and Clerk portal. Add production URL to avoid 401.
+    const defaultParties = [
+      'http://localhost:3000', 'http://localhost:8080', 'http://localhost:5173',
+      'http://localhost:51806', 'http://localhost:55926', 'http://localhost:57188',
+      'http://localhost:52297', 'https://localhost',
+      'https://working-turtle-74.accounts.dev', 'https://working-turtle-74.clerk.accounts.dev',
+      'https://re-uni.vercel.app',
+    ];
     const authorizedParties = process.env.CLERK_AUTHORIZED_PARTIES
       ? process.env.CLERK_AUTHORIZED_PARTIES.split(',').map((s) => s.trim()).filter(Boolean)
-      : ['http://localhost:3000', 'http://localhost:8080', 'https://localhost'];
+      : defaultParties;
     const result = await verifyToken(clerkToken, {
       secretKey,
       authorizedParties,
@@ -48,6 +63,10 @@ module.exports = async (req, res) => {
     const customToken = await admin.auth().createCustomToken(clerkUserId);
     return res.status(200).json({ token: customToken });
   } catch (e) {
-    return res.status(401).json({ error: 'Invalid Clerk token' });
+    const msg = e && e.message ? String(e.message) : '';
+    if (msg.includes('FIREBASE_SERVICE_ACCOUNT_JSON') || msg.includes('invalid JSON')) {
+      return res.status(500).json({ error: 'Backend config error', detail: msg });
+    }
+    return res.status(401).json({ error: 'Invalid Clerk token', detail: msg });
   }
 };
